@@ -116,7 +116,7 @@ class AuthService {
 
     const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
     const { subject, html } = emailTemplates.resetPassword(user.name, resetLink);
-    await sendMail({ to: email, subject, html });
+    sendMail({ to: email, subject, html }).catch(() => {});
   }
 
   async resetPassword(token, newPassword) {

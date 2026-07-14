@@ -1,8 +1,19 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/sidebar/Sidebar';
 import TopBar from '../components/TopBar';
 
 export default function MainLayout() {
+  const location = useLocation();
+  const isCollaborate = location.pathname.endsWith('/collaborate');
+
+  if (isCollaborate) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-surface-950 text-white">
+        <Outlet />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'rgb(var(--surface-950))', color: 'rgb(var(--text-base))' }}>
       <Sidebar />

@@ -129,7 +129,7 @@ export default function CollaboratePage() {
   // ── Loading screen ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)] bg-surface-950">
+      <div className="flex items-center justify-center h-screen bg-surface-950">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="w-14 h-14 border-4 border-primary-600/30 border-t-primary-600 rounded-full animate-spin" />
@@ -148,7 +148,7 @@ export default function CollaboratePage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)] bg-surface-950">
+      <div className="flex items-center justify-center h-screen bg-surface-950">
         <div className="text-center space-y-3">
           <p className="text-red-400 font-medium">{error}</p>
           <button onClick={() => navigate('/dashboard')} className="text-primary-400 text-sm hover:underline">
@@ -162,7 +162,7 @@ export default function CollaboratePage() {
   const onlineCount = members.filter((m) => m.isOnline !== false).length || members.length;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-surface-950 overflow-hidden">
+    <div className="flex flex-col h-screen bg-surface-950 overflow-hidden">
       {/* ── Top Bar ──────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 h-11 bg-surface-900 border-b border-surface-800 px-3 flex items-center gap-3">
         <Link

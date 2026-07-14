@@ -7,7 +7,8 @@ import {
   TbMouse, TbPencil, TbSquare, TbCircle, TbArrowUpRight,
   TbLine, TbLetterT, TbEraser, TbArrowBackUp, TbArrowForwardUp,
   TbTrash, TbDownload, TbZoomIn, TbZoomOut,
-  TbHandGrab, TbNote, TbFileExport, TbFileImport, TbUpload
+  TbHandGrab, TbNote, TbFileExport, TbFileImport, TbUpload,
+  TbChevronLeft, TbChevronRight, TbSettings, TbPalette
 } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
@@ -31,6 +32,7 @@ export default function WhiteboardPanel({ height = 500 }) {
   const [remoteCursors, setRemoteCursors] = useState({});
   const [stageSize, setStageSize] = useState({ width: 800, height });
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   const stageRef = useRef(null);
   const containerRef = useRef(null);
@@ -196,6 +198,44 @@ export default function WhiteboardPanel({ height = 500 }) {
     emitWhiteboardEvent(currentRoom?._id, { type: 'update', shape });
   };
 
+  const handleShapeTransformEnd = (e, shapeId) => {
+    const target = e.target;
+    const shape = useWhiteboardStore.getState().shapes.find((s) => s.id === shapeId);
+    if (!shape) return;
+
+    let updatedShape = { ...shape };
+    const scaleX = target.scaleX();
+    const scaleY = target.scaleY();
+
+    updatedShape.x = target.x();
+    updatedShape.y = target.y();
+
+    if (shape.type === 'rect') {
+      updatedShape.width = (shape.width || 1) * scaleX;
+      updatedShape.height = (shape.height || 1) * scaleY;
+    } else if (shape.type === 'circle') {
+      updatedShape.radius = (shape.radius || 1) * Math.max(scaleX, scaleY);
+    } else if (shape.type === 'text') {
+      updatedShape.fontSize = (shape.fontSize || 18) * Math.max(scaleX, scaleY);
+    } else if (shape.type === 'sticky') {
+      updatedShape.width = (shape.width || 150) * scaleX;
+      updatedShape.height = (shape.height || 150) * scaleY;
+    } else if (shape.type === 'line' || shape.type === 'straightLine' || shape.type === 'arrow') {
+      const newPoints = [];
+      for (let i = 0; i < shape.points.length; i += 2) {
+        newPoints.push(shape.points[i] * scaleX);
+        newPoints.push(shape.points[i + 1] * scaleY);
+      }
+      updatedShape.points = newPoints;
+    }
+
+    target.scaleX(1);
+    target.scaleY(1);
+
+    updateShape(shapeId, updatedShape);
+    emitWhiteboardEvent(currentRoom?._id, { type: 'update', shape: updatedShape });
+  };
+
   const handleStageDragEnd = (e) => {
     if (e.target === e.target.getStage()) setPan({ x: e.target.x(), y: e.target.y() });
   };
@@ -261,6 +301,7 @@ export default function WhiteboardPanel({ height = 500 }) {
       onClick: (e) => handleShapeClick(e, shape.id),
       draggable: tool === 'select',
       onDragEnd: (e) => handleShapeDragEnd(e, shape.id),
+      onTransformEnd: (e) => handleShapeTransformEnd(e, shape.id),
     };
     if (shape.type === 'line') return <Line {...common} points={shape.points} stroke={shape.stroke} strokeWidth={shape.strokeWidth} lineCap={shape.lineCap} lineJoin={shape.lineJoin} tension={shape.tension || 0} globalCompositeOperation={shape.isEraser ? 'destination-out' : 'source-over'} />;
     if (shape.type === 'rect') return <Rect {...common} x={shape.x} y={shape.y} width={shape.width} height={shape.height} stroke={shape.stroke} strokeWidth={shape.strokeWidth} fill={shape.fill || 'transparent'} />;
@@ -270,8 +311,8 @@ export default function WhiteboardPanel({ height = 500 }) {
     if (shape.type === 'sticky') {
       return (
         <Group {...common} x={shape.x} y={shape.y}>
-          <Rect width={150} height={150} fill={shape.fill} stroke={shape.stroke} strokeWidth={1} cornerRadius={4} shadowColor="black" shadowBlur={4} shadowOffset={{ x: 2, y: 2 }} shadowOpacity={0.15} />
-          <Text width={150} height={150} text={shape.text} fill="#1e293b" align="center" verticalAlign="middle" padding={10} wrap="char" fontSize={16} fontFamily="Inter, sans-serif" />
+          <Rect width={shape.width || 150} height={shape.height || 150} fill={shape.fill} stroke={shape.stroke} strokeWidth={1} cornerRadius={4} shadowColor="black" shadowBlur={4} shadowOffset={{ x: 2, y: 2 }} shadowOpacity={0.15} />
+          <Text width={shape.width || 150} height={shape.height || 150} text={shape.text} fill="#1e293b" align="center" verticalAlign="middle" padding={10} wrap="char" fontSize={16} fontFamily="Inter, sans-serif" />
         </Group>
       );
     }
@@ -284,75 +325,155 @@ export default function WhiteboardPanel({ height = 500 }) {
       key={id}
       title={label}
       onClick={() => setTool(id)}
-      className={`p-1.5 rounded transition-all ${tool === id ? 'bg-primary-600 text-white shadow-sm' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
+      className={`p-2.5 rounded-xl transition-all ${tool === id ? 'bg-primary-600 text-white shadow-md scale-105' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
     >
       {icon}
     </button>
   );
 
   return (
-    <div className="flex flex-col h-full bg-surface-950 overflow-hidden select-none relative">
-      {/* Toolbar */}
-      <div className="flex-shrink-0 h-12 bg-surface-900 border-b border-surface-800 px-3 flex items-center gap-2 flex-wrap">
-        {/* Tools */}
-        <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-1 border border-surface-700">
-          {toolBtn('select', <TbMouse size={15}/>, 'Select (V)')}
-          {toolBtn('hand', <TbHandGrab size={15}/>, 'Pan (H)')}
-          {toolBtn('pen', <TbPencil size={15}/>, 'Pen (P)')}
-          {toolBtn('line', <TbLine size={15}/>, 'Line')}
-          {toolBtn('arrow', <TbArrowUpRight size={15}/>, 'Arrow')}
-          {toolBtn('rect', <TbSquare size={15}/>, 'Rectangle')}
-          {toolBtn('circle', <TbCircle size={15}/>, 'Circle')}
-          {toolBtn('text', <TbLetterT size={15}/>, 'Text')}
-          {toolBtn('sticky', <TbNote size={15}/>, 'Sticky Note')}
-          {toolBtn('eraser', <TbEraser size={15}/>, 'Eraser')}
-        </div>
-
-        {/* Color swatches */}
-        <div className="flex items-center gap-1">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              title={c}
-              onClick={() => setColor(c)}
-              style={{ background: c }}
-              className={`w-5 h-5 rounded-full border-2 transition-transform ${color === c ? 'border-primary-400 scale-125' : 'border-transparent hover:scale-110'}`}
-            />
-          ))}
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
-            className="w-6 h-6 rounded cursor-pointer bg-transparent border border-surface-700 p-0" title="Custom color" />
-        </div>
-
-        {/* Brush size */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-surface-400">Size</span>
-          <input type="range" min={1} max={30} value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))}
-            className="w-20 accent-primary-500" />
-          <span className="text-xs text-surface-400 w-5">{strokeWidth}</span>
-        </div>
-
-        <div className="ml-auto flex items-center gap-1.5">
-          {/* Undo / Redo */}
-          <button onClick={handleUndo} title="Undo (Ctrl+Z)" className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors"><TbArrowBackUp size={15}/></button>
-          <button onClick={handleRedo} title="Redo (Ctrl+Y)" className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors"><TbArrowForwardUp size={15}/></button>
-
-          {/* Zoom */}
-          <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors"><TbZoomOut size={15}/></button>
-          <span className="text-xs text-surface-400 w-10 text-center">{Math.round(zoom * 100)}%</span>
-          <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors"><TbZoomIn size={15}/></button>
-
-          <button onClick={handleExport} title="Export PNG" className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors"><TbDownload size={15}/></button>
-          <button onClick={handleExportJSON} title="Export JSON" className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors"><TbFileExport size={15}/></button>
-          <label className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors cursor-pointer" title="Import JSON">
-            <TbFileImport size={15} />
-            <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
-          </label>
-          <button onClick={handleClear} title="Clear Canvas" className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"><TbTrash size={15}/></button>
-        </div>
+    <div className="w-full h-full bg-[#0b0f19] select-none relative overflow-hidden flex flex-col">
+      {/* FLOATING TOP TOOLBAR */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-[#0b0f19]/80 backdrop-blur-md border border-slate-800/80 shadow-2xl rounded-2xl p-1.5 px-3 transition-all hover:border-slate-700">
+        {toolBtn('select', <TbMouse size={18}/>, 'Select (V)')}
+        {toolBtn('hand', <TbHandGrab size={18}/>, 'Pan (H)')}
+        {toolBtn('pen', <TbPencil size={18}/>, 'Pen (P)')}
+        {toolBtn('line', <TbLine size={18}/>, 'Line')}
+        {toolBtn('arrow', <TbArrowUpRight size={18}/>, 'Arrow')}
+        {toolBtn('rect', <TbSquare size={18}/>, 'Rectangle')}
+        {toolBtn('circle', <TbCircle size={18}/>, 'Circle')}
+        {toolBtn('text', <TbLetterT size={18}/>, 'Text')}
+        {toolBtn('sticky', <TbNote size={18}/>, 'Sticky Note')}
+        {toolBtn('eraser', <TbEraser size={18}/>, 'Eraser')}
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 overflow-hidden relative bg-[#0f172a]">
+      {/* FLOATING PROPERTIES SIDEBAR / SETTINGS PANEL */}
+      {panelCollapsed ? (
+        <button
+          onClick={() => setPanelCollapsed(false)}
+          title="Show Style Properties"
+          className="absolute top-4 left-4 z-20 p-3 bg-[#0b0f19]/90 backdrop-blur-md border border-slate-800/90 hover:border-slate-700 shadow-2xl rounded-2xl text-slate-400 hover:text-white transition-all scale-100 hover:scale-105"
+        >
+          <TbSettings size={20} />
+        </button>
+      ) : (
+        <div className="absolute top-4 left-4 z-20 flex flex-col gap-4 bg-[#0b0f19]/85 backdrop-blur-md border border-slate-800/80 shadow-2xl rounded-2xl p-4 w-60 max-h-[85%] overflow-y-auto no-scrollbar text-white transition-all">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="text-sm font-semibold flex items-center gap-1.5 text-slate-200">
+              <TbPalette className="text-primary-400" size={16} />
+              Canvas Settings
+            </span>
+            <button
+              onClick={() => setPanelCollapsed(true)}
+              title="Minimize Panel"
+              className="p-1 rounded-lg text-slate-450 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <TbChevronLeft size={16} />
+            </button>
+          </div>
+
+          {/* Color swatches */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Stroke Color</label>
+            <div className="grid grid-cols-5 gap-1.5">
+              {COLORS.map((c) => (
+                <button
+                  key={c}
+                  title={c}
+                  onClick={() => setColor(c)}
+                  style={{ background: c }}
+                  className={`w-6 h-6 rounded-lg border-2 transition-all ${color === c ? 'border-primary-400 scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
+                />
+              ))}
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-6 h-6 rounded-lg cursor-pointer bg-transparent border border-slate-700 p-0"
+                title="Custom color"
+              />
+            </div>
+          </div>
+
+          {/* Brush size */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Stroke Width</label>
+              <span className="text-xs font-bold text-primary-400 bg-primary-950/40 px-1.5 py-0.5 rounded-md">{strokeWidth}px</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={30}
+              value={strokeWidth}
+              onChange={(e) => setStrokeWidth(Number(e.target.value))}
+              className="w-full accent-primary-500 bg-slate-800 h-1 rounded-lg cursor-pointer"
+            />
+          </div>
+
+          {/* Undo / Redo & Zoom unified row */}
+          <div className="space-y-1.5 border-t border-slate-800 pt-3">
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">History & View</label>
+            <div className="flex items-center justify-between bg-slate-800/40 p-1 rounded-xl border border-slate-800/60">
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleUndo} title="Undo (Ctrl+Z)" className="p-2 text-slate-450 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><TbArrowBackUp size={16}/></button>
+                <button onClick={handleRedo} title="Redo (Ctrl+Y)" className="p-2 text-slate-450 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><TbArrowForwardUp size={16}/></button>
+              </div>
+              <div className="h-6 w-[1px] bg-slate-800" />
+              <div className="flex items-center gap-0.5">
+                <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-2 text-slate-450 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><TbZoomOut size={16}/></button>
+                <span className="text-[10px] text-slate-300 font-bold w-12 text-center">{Math.round(zoom * 100)}%</span>
+                <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} className="p-2 text-slate-450 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><TbZoomIn size={16}/></button>
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons (Clear / Export / Import) */}
+          <div className="space-y-2 border-t border-slate-800 pt-3">
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Actions</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white text-xs font-semibold rounded-xl border border-slate-700/30 transition-colors"
+                title="Export PNG"
+              >
+                <TbDownload size={14}/>
+                <span>PNG</span>
+              </button>
+              <button
+                onClick={handleExportJSON}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white text-xs font-semibold rounded-xl border border-slate-700/30 transition-colors"
+                title="Export JSON"
+              >
+                <TbFileExport size={14}/>
+                <span>JSON</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-750/30 cursor-pointer transition-colors"
+                title="Import JSON"
+              >
+                <TbFileImport size={14} />
+                <span>Import JSON</span>
+                <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
+              </label>
+
+              <button
+                onClick={handleClear}
+                className="p-2 bg-red-950/20 hover:bg-red-900/30 border border-red-900/30 hover:border-red-800/40 text-red-400 hover:text-red-300 rounded-xl transition-all"
+                title="Clear Canvas"
+              >
+                <TbTrash size={16}/>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANVAS CONTAINER */}
+      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#0b0f19]">
         <Stage
           ref={stageRef}
           width={stageSize.width}
@@ -384,8 +505,8 @@ export default function WhiteboardPanel({ height = 500 }) {
             className="absolute pointer-events-none z-10 flex items-center gap-1"
             style={{ left: cursor.x, top: cursor.y, transform: 'translate(8px, -4px)' }}
           >
-            <div className="w-2 h-2 rounded-full bg-green-400 ring-2 ring-green-400/30" />
-            <span className="bg-green-500/90 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 ring-4 ring-indigo-400/20 shadow-glow" />
+            <span className="bg-indigo-600/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap shadow-2xl border border-indigo-500/20">
               {cursor.name}
             </span>
           </div>

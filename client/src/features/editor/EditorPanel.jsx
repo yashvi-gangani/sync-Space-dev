@@ -4,7 +4,7 @@ import * as Y from 'yjs';
 import { useSocket } from '../../context/SocketContext';
 import { useRoomStore } from '../../store/roomStore';
 import { useEditorStore } from '../../store/editorStore';
-import { TbCopy, TbDownload, TbCheck, TbWand } from 'react-icons/tb';
+import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
 const LANGUAGES = [
@@ -32,11 +32,18 @@ export default function EditorPanel() {
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saving' | 'saved'
   const [copied, setCopied] = useState(false);
 
+  // Code Execution States
+  const [isRunning, setIsRunning] = useState(false);
+  const [output, setOutput] = useState([]);
+  const [showConsole, setShowConsole] = useState(false);
+
   const ydocRef = useRef(null);
   const editorRef = useRef(null);
   const isApplyingUpdate = useRef(false);
   const saveTimer = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const yjsUpdateTimer = useRef(null);
+  const runCodeRef = useRef(null);
 
   useEffect(() => {
     if (!currentRoom) return;
@@ -92,8 +99,6 @@ export default function EditorPanel() {
     };
   }, [currentRoom?._id, isConnected]);
 
-  const yjsUpdateTimer = useRef(null);
-
   const handleEditorChange = useCallback((value) => {
     if (isApplyingUpdate.current) return;
     setEditorValue(value || '');
@@ -147,6 +152,64 @@ export default function EditorPanel() {
     URL.revokeObjectURL(a.href);
   };
 
+  // JS Code execution engine in browser
+  const handleRunCode = useCallback(() => {
+    if (language !== 'javascript') {
+      toast.error('Code execution is currently supported for JavaScript only.');
+      return;
+    }
+    setIsRunning(true);
+    setShowConsole(true);
+    setOutput(['Executing code...']);
+
+    setTimeout(() => {
+      try {
+        const logs = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const originalInfo = console.info;
+
+        console.log = (...args) => {
+          logs.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+        };
+        console.error = (...args) => {
+          logs.push('[ERROR] ' + args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+        };
+        console.warn = (...args) => {
+          logs.push('[WARN] ' + args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+        };
+        console.info = (...args) => {
+          logs.push('[INFO] ' + args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+        };
+
+        try {
+          // Standard JS execution in browser
+          const result = eval(editorValue);
+          if (result !== undefined) {
+            logs.push(`=> ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}`);
+          }
+          setOutput(logs.length > 0 ? logs : ['Code executed successfully with no output.']);
+        } catch (err) {
+          setOutput([...logs, `Runtime Error: ${err.message}`]);
+        } finally {
+          console.log = originalLog;
+          console.error = originalError;
+          console.warn = originalWarn;
+          console.info = originalInfo;
+        }
+      } catch (globalErr) {
+        setOutput([`Execution Failed: ${globalErr.message}`]);
+      } finally {
+        setIsRunning(false);
+      }
+    }, 150); // slight timeout to show loading spinner
+  }, [editorValue, language]);
+
+  useEffect(() => {
+    runCodeRef.current = handleRunCode;
+  }, [handleRunCode]);
+
   return (
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
       {/* Toolbar */}
@@ -179,6 +242,18 @@ export default function EditorPanel() {
           {[12, 13, 14, 15, 16, 18, 20, 22].map((s) => <option key={s} value={s}>{s}px</option>)}
         </select>
 
+        {/* Run code button */}
+        {language === 'javascript' && (
+          <button
+            onClick={handleRunCode}
+            disabled={isRunning}
+            className="flex items-center gap-1.5 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors shadow-glow-sm"
+          >
+            <TbPlayerPlay size={13} />
+            <span>{isRunning ? 'Running...' : 'Run'}</span>
+          </button>
+        )}
+
         <div className="ml-auto flex items-center gap-2">
           {/* Save indicator */}
           <span className={`text-xs transition-colors ${saveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'}`}>
@@ -197,31 +272,87 @@ export default function EditorPanel() {
         </div>
       </div>
 
-      {/* Monaco Editor */}
-      <div className="flex-1 overflow-hidden">
-        <MonacoEditor
-          height="100%"
-          language={language}
-          theme={editorTheme}
-          value={editorValue}
-          onChange={handleEditorChange}
-          onMount={(editor) => { editorRef.current = editor; }}
-          options={{
-            fontSize,
-            minimap: { enabled: false },
-            automaticLayout: true,
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            lineNumbers: 'on',
-            renderLineHighlight: 'all',
-            cursorBlinking: 'smooth',
-            cursorSmoothCaretAnimation: 'on',
-            smoothScrolling: true,
-            padding: { top: 12, bottom: 12 },
-            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-            fontLigatures: true,
-          }}
-        />
+      {/* Editor + Output split container */}
+      <div className="flex-1 overflow-hidden relative flex flex-col">
+        <div className="flex-1 min-h-0">
+          <MonacoEditor
+            height="100%"
+            language={language}
+            theme={editorTheme}
+            value={editorValue}
+            onChange={handleEditorChange}
+            onMount={(editor, monaco) => {
+              editorRef.current = editor;
+              // Add command to bind Ctrl+Enter shortcut within Monaco
+              editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                runCodeRef.current?.();
+              });
+            }}
+            options={{
+              fontSize,
+              minimap: { enabled: false },
+              automaticLayout: true,
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              lineNumbers: 'on',
+              renderLineHighlight: 'all',
+              cursorBlinking: 'smooth',
+              cursorSmoothCaretAnimation: 'on',
+              smoothScrolling: true,
+              padding: { top: 12, bottom: 12 },
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+              fontLigatures: true,
+            }}
+          />
+        </div>
+
+        {/* OUTPUT PANEL */}
+        {showConsole && (
+          <div className="h-44 border-t border-slate-800 bg-[#070b13] flex flex-col flex-shrink-0 text-white font-mono text-[11px]">
+            <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Output</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setOutput([])}
+                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 hover:text-white rounded text-[10px] text-slate-450 transition-colors"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => setShowConsole(false)}
+                  className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900/30 hover:text-red-300 rounded text-[10px] text-red-400 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 p-3 overflow-y-auto space-y-1 select-text selection:bg-indigo-500/30">
+              {output.length === 0 ? (
+                <div className="text-slate-500 italic">No output. Click "Run" to execute the code.</div>
+              ) : (
+                output.map((line, idx) => {
+                  let textClass = "text-slate-300";
+                  if (line.startsWith('[ERROR]')) {
+                    textClass = "text-red-400";
+                  } else if (line.startsWith('[WARN]')) {
+                    textClass = "text-yellow-400";
+                  } else if (line.startsWith('[INFO]')) {
+                    textClass = "text-blue-400";
+                  } else if (line.startsWith('=>')) {
+                    textClass = "text-green-400 font-semibold";
+                  } else if (line.startsWith('Runtime Error:')) {
+                    textClass = "text-red-500 font-semibold border-l-2 border-red-500 pl-2 py-0.5 bg-red-950/10";
+                  }
+                  return (
+                    <div key={idx} className={`${textClass} whitespace-pre-wrap leading-relaxed`}>
+                      {line}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
