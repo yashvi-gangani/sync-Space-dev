@@ -17,7 +17,7 @@ import toast from 'react-hot-toast';
 export default function CollaboratePage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { currentRoom, currentSession, setCurrentRoom, setCurrentSession, members } = useRoomStore();
+  const { currentRoom, currentSession, setCurrentRoom, setCurrentSession, setMembers, members } = useRoomStore();
   const { chatOpen, setChatOpen } = useUIStore();
   const { joinRoom, leaveRoom, isConnected } = useSocket();
 
@@ -38,12 +38,24 @@ export default function CollaboratePage() {
         setLoading(true);
         setError(null);
 
-        // Fetch room if not already in store
+        // Fetch room if not already in store (always fetch to ensure members are populated)
         let room = currentRoom;
         if (!room || room.slug !== slug) {
           const res = await roomService.getBySlug(slug);
           room = res.data.data.room;
-          if (!cancelled) setCurrentRoom(room);
+          if (!cancelled) {
+            setCurrentRoom(room);
+            // Populate members so the top-bar avatars/count work even when
+            // the user navigated directly to CollaboratePage (bypassing RoomPage)
+            setMembers(room.members || []);
+          }
+        } else if (!members || members.length === 0) {
+          // Room already in store but members weren't hydrated — re-fetch to get them
+          try {
+            const res = await roomService.getBySlug(slug);
+            room = res.data.data.room;
+            if (!cancelled) setMembers(room.members || []);
+          } catch (_) { /* non-fatal */ }
         }
 
         // Create a session (idempotent — server returns existing or creates new)
@@ -159,7 +171,8 @@ export default function CollaboratePage() {
     );
   }
 
-  const onlineCount = members.filter((m) => m.isOnline !== false).length || members.length;
+  const safeMembers = members ?? [];
+  const onlineCount = safeMembers.filter((m) => m.isOnline !== false).length || safeMembers.length;
 
   return (
     <div className="flex flex-col h-screen bg-surface-950 overflow-hidden">
@@ -220,7 +233,7 @@ export default function CollaboratePage() {
             <span>{onlineCount} online</span>
           </div>
           <div className="flex -space-x-2">
-            {members.slice(0, 5).map((m) => {
+            {safeMembers.slice(0, 5).map((m) => {
               const u = m.user || m;
               return (
                 <div
@@ -232,9 +245,9 @@ export default function CollaboratePage() {
                 </div>
               );
             })}
-            {members.length > 5 && (
+            {safeMembers.length > 5 && (
               <div className="w-7 h-7 rounded-full bg-surface-700 border-2 border-surface-900 flex items-center justify-center text-xs text-surface-300 font-bold">
-                +{members.length - 5}
+                +{safeMembers.length - 5}
               </div>
             )}
           </div>

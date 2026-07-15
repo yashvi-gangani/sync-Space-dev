@@ -58,6 +58,14 @@ class RoomService {
     const isMember = room.members.some((m) => m.user._id.toString() === userId.toString());
     if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
 
+    // Auto-join if public and not a member
+    if (!isMember && room.type === 'public') {
+      room.members.push({ user: userId, role: 'editor' });
+      await room.save();
+      await User.findByIdAndUpdate(userId, { $addToSet: { rooms: room._id } });
+      await room.populate('members.user', 'name email avatar isOnline lastSeen');
+    }
+
     return room;
   }
 
@@ -70,6 +78,14 @@ class RoomService {
 
     const isMember = room.members.some((m) => m.user._id.toString() === userId.toString());
     if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
+
+    // Auto-join if public and not a member
+    if (!isMember && room.type === 'public') {
+      room.members.push({ user: userId, role: 'editor' });
+      await room.save();
+      await User.findByIdAndUpdate(userId, { $addToSet: { rooms: room._id } });
+      await room.populate('members.user', 'name email avatar isOnline lastSeen');
+    }
 
     return room;
   }
@@ -108,27 +124,44 @@ class RoomService {
     const requester = room.members.find((m) => m.user.toString() === userId.toString());
     if (!requester || !['owner', 'editor'].includes(requester.role)) throw new AppError('Permission denied', 403);
 
+    const invitedUser = await User.findOne({ email });
+    const inviter = await User.findById(userId);
+
+    // If the invited user is already registered, auto-join them
+    if (invitedUser) {
+      const alreadyMember = room.members.some((m) => m.user.toString() === invitedUser._id.toString());
+      if (!alreadyMember) {
+        room.members.push({ user: invitedUser._id, role: role || 'editor' });
+        await room.save();
+        await User.findByIdAndUpdate(invitedUser._id, { $addToSet: { rooms: room._id } });
+      }
+      
+      const link = `${process.env.CLIENT_URL}/room/${room.slug}`;
+      const { subject, html } = emailTemplates.roomInvitation(invitedUser.name, room.name, inviter.name, link);
+      sendMail({ to: email, subject, html }).catch(() => {});
+
+      return { status: 'accepted', invitedEmail: email, room: room._id };
+    }
+
+    // Original logic for unregistered users
     const existingInvite = await Invitation.findOne({ room: roomId, invitedEmail: email, status: 'pending' });
     if (existingInvite) throw new AppError('Invitation already sent to this email', 409);
 
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const invitedUser = await User.findOne({ email });
 
     const invitation = await Invitation.create({
       room: roomId,
       invitedBy: userId,
       invitedEmail: email,
-      invitedUser: invitedUser?._id || null,
+      invitedUser: null,
       token,
       role: role || 'editor',
       expiresAt,
     });
 
-    const inviter = await User.findById(userId);
     const link = `${process.env.CLIENT_URL}/invite/${token}`;
-    const { subject, html } = emailTemplates.roomInvitation(invitedUser?.name || email, room.name, inviter.name, link);
-    // Fire-and-forget: invitation is saved regardless of email delivery
+    const { subject, html } = emailTemplates.roomInvitation(email, room.name, inviter.name, link);
     sendMail({ to: email, subject, html }).catch(() => {});
 
     return invitation;
@@ -193,6 +226,13 @@ class RoomService {
   }
 
   async createSession(roomId, userId) {
+    const room = await Room.findById(roomId);
+    if (!room) throw new AppError('Room not found', 404);
+
+    const isMember = room.members.some((m) => m.user.toString() === userId.toString());
+    // Allow non-members into public rooms
+    if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
+
     const session = await Session.create({ room: roomId, startedBy: userId, participants: [userId] });
     await Room.findByIdAndUpdate(roomId, { lastActivity: new Date() });
     return session;
@@ -210,8 +250,10 @@ class RoomService {
   async getRoomSessions(roomId, userId) {
     const room = await Room.findById(roomId);
     if (!room) throw new AppError('Room not found', 404);
+
     const isMember = room.members.some((m) => m.user.toString() === userId.toString());
-    if (!isMember) throw new AppError('Access denied', 403);
+    // Allow non-members to view sessions for public rooms
+    if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
 
     return Session.find({ room: roomId })
       .populate('startedBy', 'name avatar')

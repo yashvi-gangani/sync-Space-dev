@@ -7,7 +7,8 @@ class ChatService {
     const room = await Room.findById(roomId);
     if (!room) throw new AppError('Room not found', 404);
     const isMember = room.members.some((m) => m.user.toString() === userId.toString());
-    if (!isMember) throw new AppError('Access denied', 403);
+    // Allow non-members to read chat in public rooms
+    if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
 
     const skip = (Number(page) - 1) * Number(limit);
     const messages = await ChatMessage.find({ room: roomId, isDeleted: false })

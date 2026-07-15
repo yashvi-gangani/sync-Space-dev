@@ -112,6 +112,8 @@ export default function RoomPage() {
     );
   }
 
+  if (!currentRoom) return null;
+
   const isOwner = currentRoom.owner._id === user._id;
 
   return (
