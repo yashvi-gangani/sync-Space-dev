@@ -23,8 +23,7 @@ const VideoStream = ({ stream, isLocal, muted }) => {
 };
 
 export default function MeetingOverlay({ roomId }) {
-  const { isInMeeting, localStream, meetingParticipants, audioEnabled, videoEnabled, setMeetingState, clearMeeting } = useMeetingStore();
-  const { socket } = useMeetingStore((state) => ({ socket: null })); // get from context ideally, but we will pass down methods or use store
+  const { isInMeeting, localStream, meetingParticipants, audioEnabled, videoEnabled, setMeetingState } = useMeetingStore();
 
   if (!isInMeeting) return null;
 

@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useEffect, useRef, useState, Component } from 'react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { useRoomStore } from '../store/roomStore';
-import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
 import { roomService } from '../services';
 import WhiteboardPanel from '../features/whiteboard/WhiteboardPanel';
@@ -13,12 +12,31 @@ import MeetingManager from '../features/meeting/MeetingManager';
 import MeetingOverlay from '../features/meeting/MeetingOverlay';
 import ScreenShareViewer from '../features/meeting/ScreenShareViewer';
 import { useMeetingStore } from '../store/meetingStore';
-import { useSearchParams } from 'react-router-dom';
 import {
   TbChevronLeft, TbUsers, TbMessage, TbLayoutColumns, TbBrush, TbCode,
   TbGripVertical, TbWifi, TbWifiOff, TbVideoPlus, TbPhoneOff, TbScreenShare, TbScreenShareOff
 } from 'react-icons/tb';
 import toast from 'react-hot-toast';
+
+// ── Inline Error Boundary to isolate new features from crashing the page ──
+class FeatureBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('[FeatureBoundary] Caught error in', this.props.name, ':', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return null; // Silently hide the broken feature without killing the whole page
+    }
+    return this.props.children;
+  }
+}
 
 export default function CollaboratePage() {
   const { slug } = useParams();
@@ -55,12 +73,9 @@ export default function CollaboratePage() {
           room = res.data.data.room;
           if (!cancelled) {
             setCurrentRoom(room);
-            // Populate members so the top-bar avatars/count work even when
-            // the user navigated directly to CollaboratePage (bypassing RoomPage)
             setMembers(room.members || []);
           }
         } else if (!members || members.length === 0) {
-          // Room already in store but members weren't hydrated — re-fetch to get them
           try {
             const res = await roomService.getBySlug(slug);
             room = res.data.data.room;
@@ -74,7 +89,6 @@ export default function CollaboratePage() {
             const sRes = await roomService.createSession(room._id);
             if (!cancelled) setCurrentSession(sRes.data.data.session);
           } catch (sessionErr) {
-            // Session may already exist — not a fatal error, continue
             console.warn('Session create warning (non-fatal):', sessionErr?.response?.data?.message);
           }
         }
@@ -148,13 +162,12 @@ export default function CollaboratePage() {
     };
   }, [dragging]);
 
+  // ── Activity tracking ────────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
     
     const handleActivity = ({ userId, activity }) => {
       setActivities(prev => ({ ...prev, [userId]: activity }));
-      
-      // Auto clear after 5s if it's not a continuous state
       if (['editing_doc', 'drawing', 'typing_code'].includes(activity)) {
         setTimeout(() => {
           setActivities(prev => {
@@ -216,8 +229,6 @@ export default function CollaboratePage() {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         setMeetingState({ isScreenSharing: true, localScreenStream: stream });
         emitScreenShareStart(currentRoom?._id);
-        
-        // Listen for user stopping via browser UI
         stream.getVideoTracks()[0].onended = () => {
           setMeetingState({ isScreenSharing: false, localScreenStream: null });
           emitScreenShareStop(currentRoom?._id);
@@ -396,17 +407,21 @@ export default function CollaboratePage() {
       {/* ── Main Area ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative" ref={containerRef}>
         
-        <MeetingManager />
-        <MeetingOverlay roomId={currentRoom?._id} />
+        {/* Meeting Manager & Overlay — wrapped in error boundaries so they can never crash the page */}
+        <FeatureBoundary name="MeetingManager">
+          <MeetingManager />
+        </FeatureBoundary>
+        <FeatureBoundary name="MeetingOverlay">
+          <MeetingOverlay roomId={currentRoom?._id} />
+        </FeatureBoundary>
 
-        {/* Screen Share Viewer (Full screen in this pane if someone is sharing, ignoring normal layout) */}
-        {/* We would need to detect if remote screen sharing is active. For now, we only show local layout. 
-            If a participant is sharing their screen, we could render it instead of the editor.
-            Let's keep it simple: if there is a screen share stream in participants, show it. */}
+        {/* Screen Share Viewer */}
         {meetingParticipants.some(p => p.isSharingScreen) && (
-           <div className="absolute inset-0 z-40 bg-black">
-             <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen).stream} />
-           </div>
+          <FeatureBoundary name="ScreenShareViewer">
+            <div className="absolute inset-0 z-40 bg-black">
+              <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen)?.stream} />
+            </div>
+          </FeatureBoundary>
         )}
 
         {/* Whiteboard Panel */}
@@ -438,7 +453,13 @@ export default function CollaboratePage() {
             className="flex-1 overflow-hidden border-l border-surface-800"
             style={{ width: layout === 'both' ? `${100 - dividerX}%` : '100%' }}
           >
-            {docId ? <DocumentPanel /> : <EditorPanel />}
+            {docId ? (
+              <FeatureBoundary name="DocumentPanel">
+                <DocumentPanel />
+              </FeatureBoundary>
+            ) : (
+              <EditorPanel />
+            )}
           </div>
         )}
 
