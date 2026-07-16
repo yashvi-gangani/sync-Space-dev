@@ -1,0 +1,95 @@
+.room-page{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    background:#eef2f7;
+}
+
+.room-header{
+    height:70px;
+    background:white;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0 30px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+.room-header button{
+    background:#ef4444;
+    color:white;
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.workspace{
+    flex:1;
+    display:grid;
+    grid-template-columns:260px 1fr 300px;
+}
+
+.members-panel{
+
+    background:white;
+
+    padding:20px;
+
+    border-right:1px solid #ddd;
+
+}
+
+.member{
+
+    margin:10px 0;
+
+}
+
+.editor-area{
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+.whiteboard{
+
+    flex:1;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:white;
+
+    border-bottom:1px solid #ddd;
+
+}
+
+.code-editor{
+
+    height:300px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:#f8fafc;
+
+}
+
+.chat-panel{
+
+    background:white;
+
+    padding:20px;
+
+    border-left:1px solid #ddd;
+
+}

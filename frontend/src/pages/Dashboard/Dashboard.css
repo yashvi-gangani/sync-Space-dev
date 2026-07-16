@@ -1,0 +1,75 @@
+.dashboard {
+    min-height: 100vh;
+    background: #f5f7fb;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.dashboard-container {
+    width: 100%;
+    max-width: 1000px;
+    text-align: center;
+}
+
+.dashboard h1 {
+    font-size: 42px;
+    color: #2563eb;
+}
+
+.subtitle {
+    color: gray;
+    margin-bottom: 40px;
+}
+
+.card-container {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.card {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    width: 350px;
+    box-shadow: 0 10px 25px rgba(0,0,0,.1);
+}
+
+.card h2 {
+    margin-bottom: 15px;
+}
+
+.card p {
+    color: gray;
+}
+
+.card input {
+    width: 100%;
+    padding: 12px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.card button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    background: #2563eb;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.card button:hover {
+    background: #1d4ed8;
+}
+
+.recent {
+    margin-top: 50px;
+}
