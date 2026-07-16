@@ -23,7 +23,7 @@ const fileFilter = (_req, file, cb) => {
   }
 };
 
-const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
 const uploadToCloudinary = (buffer, folder, options = {}) =>
   new Promise((resolve, reject) => {

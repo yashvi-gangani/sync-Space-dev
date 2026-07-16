@@ -31,7 +31,7 @@ export default function DocumentViewer({ doc }) {
         const { Document, Page, pdfjs } = mod;
         // Use CDN worker to avoid Vite bundling issues with pdfjs-dist
         if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-          pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+          pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
         }
         // Also import the CSS layers
         import('react-pdf/dist/Page/AnnotationLayer.css').catch(() => {});
