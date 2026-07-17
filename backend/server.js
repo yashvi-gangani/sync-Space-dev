@@ -7,6 +7,8 @@ const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const initializeSocket = require("./socket");
+const authMiddleware = require("./middleware/authMiddleware");
+const roomRoutes = require("./routes/roomRoutes");
 
 dotenv.config();
 
@@ -27,9 +29,20 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/rooms", roomRoutes);
 
 app.get("/", (req, res) => {
     res.send("🚀 SyncSpace Backend Running...");
+});
+
+app.get("/api/test", authMiddleware, (req, res) => {
+
+    res.json({
+        success: true,
+        message: "Protected Route Working",
+        user: req.user
+    });
+
 });
 
 // Create HTTP Server

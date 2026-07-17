@@ -1,15 +1,21 @@
-const roomHandler = require("./handlers/roomHandler");
+const roomSocket = require("./roomSocket");
 
-const initializeSocket = (io) => {
+const socketHandler = (io) => {
 
     io.on("connection", (socket) => {
 
-        console.log("✅ Connected:", socket.id);
+        console.log("🟢 Connected:", socket.id);
 
-        roomHandler(io, socket);
+        roomSocket(io, socket);
+
+        socket.on("disconnect", () => {
+
+            console.log("🔴 Disconnected:", socket.id);
+
+        });
 
     });
 
 };
 
-module.exports = initializeSocket;
+module.exports = socketHandler;

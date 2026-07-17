@@ -1,98 +1,115 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import generateRoomId from "../../utils/generateRoomId";
-import "./Dashboard.css";
+import { createRoom, getMyRooms } from "../../services/roomService";
 
 const Dashboard = () => {
 
     const navigate = useNavigate();
 
-    const [joinRoomId, setJoinRoomId] = useState("");
+    const [roomName, setRoomName] = useState("");
 
-    const handleCreateRoom = () => {
+    const [rooms, setRooms] = useState([]);
 
-        const roomId = generateRoomId();
+    const loadRooms = async () => {
 
-        navigate(`/room/${roomId}`);
+        try {
+
+            const res = await getMyRooms();
+
+            if (res.success) {
+
+                setRooms(res.rooms);
+
+            }
+
+        } catch (err) {
+
+            console.log(err);
+
+        }
 
     };
 
-    const handleJoinRoom = () => {
+    useEffect(() => {
 
-        if (!joinRoomId.trim()) {
+        loadRooms();
 
-            alert("Please enter a Room ID");
+    }, []);
+
+    const handleCreateRoom = async () => {
+
+        if (!roomName.trim()) {
+
+            alert("Enter Room Name");
 
             return;
 
         }
 
-        navigate(`/room/${joinRoomId}`);
+        try {
+
+            const res = await createRoom(roomName);
+
+            if (res.success) {
+
+                navigate(`/room/${res.room.roomId}`);
+
+            }
+
+        } catch (err) {
+
+            alert(err.response?.data?.message);
+
+        }
 
     };
 
     return (
 
-        <div className="dashboard">
+        <div style={{ padding: "30px" }}>
 
-            <div className="dashboard-container">
+            <h1>Dashboard</h1>
 
-                <h1>🚀 SyncSpace</h1>
+            <br />
 
-                <p className="subtitle">
+            <input
+                placeholder="Room Name"
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value)}
+            />
 
-                    Real-Time Collaborative Whiteboard & Code Editor
+            <button
+                onClick={handleCreateRoom}
+            >
+                Create Room
+            </button>
 
-                </p>
+            <hr />
 
-                <div className="card-container">
+            <h2>My Rooms</h2>
 
-                    <div className="card">
+            {
 
-                        <h2>Create New Room</h2>
+                rooms.map((room) => (
 
-                        <p>
-                            Start a new collaboration session.
-                        </p>
+                    <div
+                        key={room._id}
+                        style={{
+                            marginBottom: "15px",
+                            cursor: "pointer"
+                        }}
+                        onClick={() =>
+                            navigate(`/room/${room.roomId}`)
+                        }
+                    >
 
-                        <button onClick={handleCreateRoom}>
-
-                            Create Room
-
-                        </button>
-
-                    </div>
-
-                    <div className="card">
-
-                        <h2>Join Existing Room</h2>
-
-                        <input
-                            type="text"
-                            placeholder="Enter Room ID"
-                            value={joinRoomId}
-                            onChange={(e) => setJoinRoomId(e.target.value)}
-                        />
-
-                        <button onClick={handleJoinRoom}>
-
-                            Join Room
-
-                        </button>
+                        <h3>{room.roomName}</h3>
 
                     </div>
 
-                </div>
+                ))
 
-                <div className="recent">
-
-                    <h2>Recent Sessions</h2>
-
-                    <p>Coming Soon...</p>
-
-                </div>
-
-            </div>
+            }
 
         </div>
 

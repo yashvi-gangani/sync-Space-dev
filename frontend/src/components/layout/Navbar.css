@@ -21,3 +21,25 @@
 .nav-links a:hover{
     color:#38bdf8;
 }
+
+.logout-btn{
+
+    background:#2563eb;
+
+    color:white;
+
+    border:none;
+
+    padding:8px 16px;
+
+    border-radius:6px;
+
+    cursor:pointer;
+
+}
+
+.logout-btn:hover{
+
+    background:#1d4ed8;
+
+}
