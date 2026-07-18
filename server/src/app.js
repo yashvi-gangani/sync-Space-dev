@@ -60,6 +60,16 @@ app.get('/health', (_req, res) => res.json({
   commit: process.env.RENDER_GIT_COMMIT || 'local'
 }));
 
+app.get('/api/v1/test-env', (_req, res) => {
+  res.json({
+    cloudinary_cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'MISSING',
+    cloudinary_api_key: process.env.CLOUDINARY_API_KEY ? 'SET' : 'MISSING',
+    cloudinary_api_secret: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING',
+    mongo_uri: process.env.MONGO_URI ? 'SET' : 'MISSING',
+    node_env: process.env.NODE_ENV,
+  });
+});
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/rooms', roomRoutes);
