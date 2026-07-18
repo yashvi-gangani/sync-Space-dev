@@ -1,4 +1,5 @@
 const roomSocket = require("./roomSocket");
+const whiteboardSocket = require("./whiteboardSocket");
 
 const socketHandler = (io) => {
 
@@ -7,6 +8,7 @@ const socketHandler = (io) => {
         console.log("🟢 Connected:", socket.id);
 
         roomSocket(io, socket);
+whiteboardSocket(io, socket);
 
         socket.on("disconnect", () => {
 
