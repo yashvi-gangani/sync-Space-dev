@@ -15,6 +15,8 @@ const EVENTS = {
     DRAW: "draw",
 
     CODE_CHANGE: "code-change",
+    LANGUAGE_CHANGE: "language-change",
+    SYNC_CODE: "sync-code",
 
     CURSOR_MOVE: "cursor-move",
 };

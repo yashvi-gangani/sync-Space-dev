@@ -32,7 +32,9 @@ const createRoom = (roomId) => {
 
         rooms.set(roomId,{
             roomId,
-            users:[]
+            users:[],
+            code: `// Welcome to SyncSpace Real-Time Code Editor!\nconsole.log("Hello, SyncSpace!");\n`,
+            language: "javascript"
         });
 
     }
@@ -45,6 +47,20 @@ const getRoom = (roomId)=>{
 
     return rooms.get(roomId);
 
+};
+
+const updateRoomCode = (roomId, code) => {
+    const room = rooms.get(roomId);
+    if (room) {
+        room.code = code;
+    }
+};
+
+const updateRoomLanguage = (roomId, language) => {
+    const room = rooms.get(roomId);
+    if (room) {
+        room.language = language;
+    }
 };
 
 const deleteRoom=(roomId)=>{
@@ -66,6 +82,10 @@ module.exports={
     createRoom,
 
     getRoom,
+
+    updateRoomCode,
+
+    updateRoomLanguage,
 
     deleteRoom,
 

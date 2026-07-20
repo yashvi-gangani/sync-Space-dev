@@ -1,4 +1,5 @@
 const roomHandler = require("./handlers/roomHandler");
+const editorHandler = require("./handlers/editorHandler");
 
 const initializeSocket = (io) => {
 
@@ -7,6 +8,7 @@ const initializeSocket = (io) => {
         console.log("✅ Connected:", socket.id);
 
         roomHandler(io, socket);
+        editorHandler(io, socket);
 
     });
 
