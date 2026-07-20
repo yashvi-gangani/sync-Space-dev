@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import socket from "../../services/socket";
+import CodeEditor from "../../components/Room/CodeEditor";
 import "./Room.css";
 
 const Room = () => {
@@ -14,7 +15,7 @@ const Room = () => {
 
         const user = {
             id: Date.now(),
-            name: "Yashvi"
+            name: "kunal"
         };
 
         socket.emit("join-room", {
@@ -114,11 +115,7 @@ const Room = () => {
 
                     </div>
 
-                    <div className="code-editor">
-
-                        Monaco Editor (Coming Soon)
-
-                    </div>
+                    <CodeEditor roomId={roomId} socket={socket} />
 
                 </main>
 
