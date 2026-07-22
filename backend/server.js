@@ -9,6 +9,7 @@ const authRoutes = require("./routes/authRoutes");
 const initializeSocket = require("./socket");
 const authMiddleware = require("./middleware/authMiddleware");
 const roomRoutes = require("./routes/roomRoutes");
+const codeRoutes = require("./routes/codeRoutes");
 
 dotenv.config();
 
@@ -20,7 +21,7 @@ const app = express();
 // Middleware
 app.use(
     cors({
-        origin: process.env.CLIENT_URL,
+        origin: true,
         credentials: true,
     })
 );
@@ -30,6 +31,7 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
+app.use("/api/execute", codeRoutes);
 
 app.get("/", (req, res) => {
     res.send("🚀 SyncSpace Backend Running...");
@@ -51,7 +53,7 @@ const server = http.createServer(app);
 // Attach Socket.io
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL,
+        origin: "*",
         methods: ["GET", "POST"],
     },
 });

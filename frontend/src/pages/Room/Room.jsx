@@ -1,3 +1,4 @@
+import CodeEditor from "../../components/Room/CodeEditor";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import socket from "../../services/socket";
@@ -110,12 +111,8 @@ const Room = () => {
 
                     </div>
 
-                    <div className="code-editor">
-
-                        <h3>💻 Monaco Editor</h3>
-
-                        <p>Coming in Week 3...</p>
-
+                    <div className="code-editor" style={{ height: "100%" }}>
+                        <CodeEditor roomId={roomId} />
                     </div>
 
                 </main>
