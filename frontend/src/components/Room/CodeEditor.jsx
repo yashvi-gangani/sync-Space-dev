@@ -4,7 +4,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import API from "../../services/api";
-import { Play, Code } from "lucide-react";
+import { Play, Code, Copy, RotateCcw, Trash2, Terminal, ChevronDown, ChevronUp, Check } from "lucide-react";
 import "./CodeEditor.css";
 
 const LANGUAGES = [
@@ -20,6 +20,8 @@ const CodeEditor = ({ roomId }) => {
     const [theme, setTheme] = useState("vs-dark");
     const [isRunning, setIsRunning] = useState(false);
     const [output, setOutput] = useState(null);
+    const [copied, setCopied] = useState(false);
+    const [showConsole, setShowConsole] = useState(true);
 
     const editorRef = useRef(null);
     const providerRef = useRef(null);
@@ -70,6 +72,7 @@ const CodeEditor = ({ roomId }) => {
         const codeContent = editorRef.current.getValue();
 
         setIsRunning(true);
+        setShowConsole(true);
         setOutput({ status: "running", stdout: "Running your code..." });
 
         try {
@@ -94,27 +97,56 @@ const CodeEditor = ({ roomId }) => {
         }
     };
 
+    // Copy code to clipboard
+    const handleCopy = () => {
+        if (!editorRef.current) return;
+        const codeContent = editorRef.current.getValue();
+        navigator.clipboard.writeText(codeContent);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Reset code to empty/default state
+    const handleReset = () => {
+        if (!editorRef.current) return;
+        editorRef.current.setValue("");
+    };
+
+    // Clear console output
+    const handleClearConsole = () => {
+        setOutput(null);
+    };
+
     return (
         <div className="code-editor-container">
             {/* Toolbar */}
             <div className="editor-toolbar">
                 <div className="toolbar-left">
-                    <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                        className="language-select"
-                    >
-                        {LANGUAGES.map((lang) => (
-                            <option key={lang.id} value={lang.id}>
-                                {lang.label}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="tool-select-wrapper">
+                        <Code size={16} className="tool-select-icon" />
+                        <select
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="language-select"
+                        >
+                            {LANGUAGES.map((lang) => (
+                                <option key={lang.id} value={lang.id}>
+                                    {lang.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
                 <div className="toolbar-right">
+                    <button onClick={handleReset} className="icon-btn" title="Reset Code">
+                        <RotateCcw size={16} />
+                    </button>
+                    <button onClick={handleCopy} className="icon-btn" title="Copy Code">
+                        {copied ? <Check size={16} className="text-green" /> : <Copy size={16} />}
+                    </button>
                     <button onClick={runCode} disabled={isRunning} className="run-btn">
-                        <Play size={16} fill="currentColor" />
-                        {isRunning ? "Running..." : "Run Code"}
+                        <Play size={15} fill="currentColor" />
+                        <span>{isRunning ? "Running..." : "Run Code"}</span>
                     </button>
                 </div>
             </div>
@@ -128,25 +160,57 @@ const CodeEditor = ({ roomId }) => {
                     onMount={handleEditorDidMount}
                     options={{
                         fontSize: 14,
+                        fontFamily: "'Fira Code', 'Consolas', monospace",
                         minimap: { enabled: false },
+                        scrollBeyondLastLine: false,
                         automaticLayout: true,
-                        wordWrap: "on"
+                        tabSize: 2,
+                        wordWrap: "on",
+                        padding: { top: 12, bottom: 12 },
+                        smoothScrolling: true,
+                        cursorBlinking: "smooth"
                     }}
                 />
             </div>
 
             {/* Terminal Panel */}
-            <div className="console-panel">
-                <div className="console-header">Console Output</div>
-                <div className="console-body">
-                    {!output && <span className="console-placeholder">Click "Run Code" to view results...</span>}
-                    {output && (
-                        <>
-                            {output.stdout && <pre className="output-stdout">{output.stdout}</pre>}
-                            {output.stderr && <pre className="output-stderr">{output.stderr}</pre>}
-                        </>
-                    )}
+            <div className={`console-panel ${showConsole ? "expanded" : "collapsed"}`}>
+                <div className="console-header" onClick={() => setShowConsole(!showConsole)}>
+                    <div className="console-title">
+                        <Terminal size={15} />
+                        <span>Console Output</span>
+                        {output && output.status === "error" && <span className="badge badge-error">Error</span>}
+                        {output && output.status === "success" && <span className="badge badge-success">Success</span>}
+                    </div>
+                    <div className="console-actions">
+                        {output && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearConsole();
+                                }}
+                                className="console-action-btn"
+                                title="Clear Console"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
+                        <button className="console-action-btn">
+                            {showConsole ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                        </button>
+                    </div>
                 </div>
+                {showConsole && (
+                    <div className="console-body">
+                        {!output && <span className="console-placeholder">Click "Run Code" to view results...</span>}
+                        {output && (
+                            <>
+                                {output.stdout && <pre className="output-stdout">{output.stdout}</pre>}
+                                {output.stderr && <pre className="output-stderr">{output.stderr}</pre>}
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

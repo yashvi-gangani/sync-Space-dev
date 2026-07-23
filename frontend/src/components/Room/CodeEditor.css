@@ -1,23 +1,29 @@
+/* Code Editor Container & Layout */
 .code-editor-container {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
-    background-color: #1e1e2e;
+    background: radial-gradient(circle at 50% 0%, #181825, #0f0f16);
     color: #cdd6f4;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Toolbar Style */
+/* Glassmorphic Toolbar */
 .editor-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
-    background-color: #181825;
-    border-bottom: 1px solid #313244;
+    padding: 10px 20px;
+    background: rgba(24, 24, 37, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    z-index: 10;
 }
 
 .toolbar-left, .toolbar-right {
@@ -26,71 +32,216 @@
     gap: 12px;
 }
 
-.language-select {
-    background-color: #313244;
-    border: 1px solid #45475a;
-    color: #cdd6f4;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 0.88rem;
-    outline: none;
-    cursor: pointer;
+/* Select Dropdown Wrapper */
+.tool-select-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(49, 50, 68, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 2px 10px;
+    transition: all 0.2s ease;
 }
 
+.tool-select-wrapper:hover {
+    background: rgba(49, 50, 68, 0.8);
+    border-color: rgba(203, 166, 247, 0.4);
+}
+
+.tool-select-icon {
+    color: #cba6f7;
+    margin-right: 6px;
+    pointer-events: none;
+}
+
+.language-select {
+    background: transparent;
+    border: none;
+    color: #cdd6f4;
+    font-size: 0.86rem;
+    font-weight: 600;
+    padding: 6px 20px 6px 0;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.language-select option {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+
+/* Utility Toolbar Buttons */
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: rgba(49, 50, 68, 0.5);
+    color: #a6adc8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-btn:hover {
+    background: rgba(203, 166, 247, 0.15);
+    color: #cba6f7;
+    border-color: rgba(203, 166, 247, 0.3);
+    transform: translateY(-1px);
+}
+
+.icon-btn:active {
+    transform: scale(0.94);
+}
+
+.text-green {
+    color: #a6e3a1 !important;
+}
+
+/* Run Code Button with Neon Glowing Effect */
 .run-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    background-color: #a6e3a1;
+    gap: 8px;
+    background: linear-gradient(135deg, #a6e3a1, #94e2d5);
     color: #11111b;
+    font-weight: 700;
+    font-size: 0.86rem;
+    padding: 8px 18px;
+    border-radius: 8px;
     border: none;
-    padding: 6px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.88rem;
     cursor: pointer;
-    transition: opacity 0.2s ease;
+    box-shadow: 0 4px 14px rgba(166, 227, 161, 0.25);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .run-btn:hover:not(:disabled) {
-    opacity: 0.9;
+    box-shadow: 0 6px 20px rgba(166, 227, 161, 0.45);
+    transform: translateY(-1px);
+}
+
+.run-btn:active:not(:disabled) {
+    transform: scale(0.96);
 }
 
 .run-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    box-shadow: none;
 }
 
-/* Editor Wrapper */
+/* Monaco Editor Container */
 .editor-wrapper {
     flex: 1;
     min-height: 0;
+    background-color: #1e1e2e;
+    position: relative;
+    padding: 8px 0;
 }
 
-/* Console Output Panel */
+/* Premium Collapsible Console */
 .console-panel {
-    background-color: #11111b;
-    border-top: 1px solid #313244;
+    background: #11111b;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
-    height: 180px;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
 }
 
+.console-panel.collapsed {
+    height: 40px;
+}
+
+.console-panel.expanded {
+    height: 220px;
+}
+
+/* Console Header */
 .console-header {
-    background-color: #181825;
-    padding: 6px 16px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #a6adc8;
-    border-bottom: 1px solid #313244;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px;
+    background: rgba(24, 24, 37, 0.5);
+    cursor: pointer;
+    user-select: none;
+    height: 40px;
+    box-sizing: border-box;
 }
 
+.console-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #a6adc8;
+}
+
+.console-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.console-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #6c7086;
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.console-action-btn:hover {
+    color: #cdd6f4;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Status Badges */
+.badge {
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-left: 8px;
+}
+
+.badge-error {
+    background: rgba(243, 139, 168, 0.15);
+    color: #f38ba8;
+    border: 1px solid rgba(243, 139, 168, 0.25);
+}
+
+.badge-success {
+    background: rgba(166, 227, 161, 0.15);
+    color: #a6e3a1;
+    border: 1px solid rgba(166, 227, 161, 0.25);
+}
+
+/* Console Body & Output */
 .console-body {
     flex: 1;
-    padding: 12px 16px;
-    font-family: monospace;
-    font-size: 0.85rem;
+    padding: 14px 20px;
     overflow-y: auto;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    background: #11111b;
 }
 
 .console-placeholder {
@@ -98,5 +249,16 @@
     font-style: italic;
 }
 
-.output-stdout { color: #a6e3a1; margin: 0; white-space: pre-wrap; }
-.output-stderr { color: #f38ba8; margin: 0; white-space: pre-wrap; }
+.output-stdout {
+    color: #a6e3a1;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.output-stderr {
+    color: #f38ba8;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
