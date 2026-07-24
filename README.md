@@ -129,9 +129,9 @@ Both the frontend and backend are deployed automatically via Render using the `r
 
 ## 🤝 Contributors
 This project is actively maintained by:
-- **@gopichandkuru** (Team Lead & Architect)
-- **@yashvi-gangani** (Frontend Engineer)
-- **@kunalkt5656** (Backend Engineer)
+- **@yashvi-gangani** (Team Lead & Architect,Auth, WebRTC)
+- **@gopichandkuru** (Frontend Engineer, Database)
+- **@kunalkt5656** (Backend Engineer, Real-time)
 - **@malathi1945** (Database & Auth)
 - **@bhagyasree31** (Real-time & WebRTC)
 
