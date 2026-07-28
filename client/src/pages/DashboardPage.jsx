@@ -22,6 +22,13 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 const ACTION_ICONS = {
   room_created: '🏠', room_joined: '🚪', session_started: '▶️',
   code_edit: '💻', draw: '🎨', chat: '💬', file_upload: '📁',
@@ -65,7 +72,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-white">
-            Welcome back, {user?.name?.split(' ')[0]} 👋
+            {getGreeting()}, {user?.name?.split(' ')[0]} 👋
           </h1>
           <p className="text-surface-400 text-sm mt-1">
             Create or join collaborative real-time sync spaces.
