@@ -1,151 +1,157 @@
-# 🚀 SyncSpace - Collaborative Workspace for Developers
+# SyncSpace - Collaborative Workspace for Developers
 
-<div align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success.svg" alt="Status" />
-  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
-  <img src="https://img.shields.io/badge/React-18.x-blue?logo=react" alt="React" />
-  <img src="https://img.shields.io/badge/Node.js-20.x-green?logo=node.js" alt="Node" />
-  <img src="https://img.shields.io/badge/MongoDB-Latest-green?logo=mongodb" alt="MongoDB" />
-  <img src="https://img.shields.io/badge/Socket.io-4.x-black?logo=socket.io" alt="Socket" />
-  
-  <p><h3>Real-Time Collaborative Code Editor, Whiteboard, Video Calling & File Sharing Platform</h3></p>
-  <p><strong>Live Demo:</strong> <a href="https://syncspace-frontend-05u3.onrender.com/">SyncSpace on Render</a></p>
-</div>
+**Real-Time Collaborative Code Editor, Whiteboard, Video Calling & File Sharing Platform**
 
----
+**Live Demo:** https://syncspace-frontend-05u3.onrender.com/
 
-## 📖 Project Overview
-**SyncSpace** is an advanced MERN stack application built as a comprehensive Software-as-a-Service (SaaS) collaboration platform. Inspired by tools like VS Code Live Share, Replit, and Excalidraw, it empowers distributed engineering teams to brainstorm, write code, share files, and communicate—all in real-time within a single unified workspace.
+# Project Overview
 
-This project is part of the **Axlero Solutions Advanced MERN Stack Engineering Program** and is strictly maintained under a professional software company workflow.
+SyncSpace is a MERN stack based collaborative workspace where multiple users can work together in real time. It combines features like a collaborative code editor, whiteboard, chat, video calling, and file sharing in a single platform.
 
-## ✨ Key Features
-- **Real-Time Collaboration**: Cursor synchronization and real-time document editing powered by **Yjs** CRDTs and Socket.IO.
-- **Advanced Code Editor**: Integrated **Monaco Editor** (VS Code engine) supporting syntax highlighting, auto-completion, and formatting.
-- **Code Execution Engine (Run Button)**: Execute Python, Java, C++, Go, Rust, and JavaScript directly in the browser via the **Piston API** with synced console output.
-- **Live HTML/CSS Preview**: Split-pane live preview for web development (`srcDoc` iframe) that instantly syncs across all participants.
-- **Infinite Whiteboard**: Real-time collaborative canvas for system design and brainstorming.
-- **Video & Audio Calling**: Integrated WebRTC-based peer-to-peer communication.
-- **File & PDF Sharing**: Cloudinary integration for robust document and image sharing.
-- **Chat & Notifications**: Persistent room chat and presence indicators.
-- **Action Replay**: Time-travel debugging and session playback for whiteboard and editor events.
+The project was inspired by tools like VS Code Live Share, Replit, and Excalidraw. We developed this project as part of the **Axlero Solutions Advanced MERN Stack Engineering Program** to learn full-stack development, real-time communication, and team collaboration.
 
-## 🏗️ Architecture
-The platform is built using a modern, scalable architecture:
-- **Frontend**: React (Vite), TailwindCSS, Zustand (State Management), Yjs (CRDTs).
-- **Backend**: Node.js, Express.js, Socket.IO (WebSockets).
-- **Database**: MongoDB (Mongoose ORM).
-- **Storage**: Cloudinary (for avatars and file uploads).
-- **Execution**: Piston API (Stateless Code Execution).
 
-## 🚀 Tech Stack
+# Key Features
+
+- Real-time collaboration using Socket.IO and Yjs
+- Collaborative code editor with Monaco Editor
+- Run Python, Java, C++, Go, Rust, and JavaScript using the Piston API
+- Live HTML/CSS preview
+- Shared whiteboard for brainstorming
+- Video and audio calling using WebRTC
+- File and PDF sharing using Cloudinary
+- Room chat with user presence
+- Action replay for editor and whiteboard events
+
+
+# Architecture
+
+The project uses the following technologies:
+
+- **Frontend:** React (Vite), Tailwind CSS, Zustand, Yjs
+- **Backend:** Node.js, Express.js, Socket.IO
+- **Database:** MongoDB with Mongoose
+- **Storage:** Cloudinary
+- **Code Execution:** Piston API
+
+# Tech Stack
+
 | Category | Technology |
-|---|---|
-| **Frontend** | React, Tailwind CSS, Monaco Editor, Zustand, React-Hot-Toast |
-| **Backend** | Node.js, Express, Socket.IO, JWT, Bcrypt |
-| **Database** | MongoDB, Cloudinary |
-| **Real-time** | WebSockets (Socket.IO), WebRTC, Yjs (CRDTs) |
-| **DevOps** | Render (PaaS), GitHub Actions |
+|----------|------------|
+| Frontend | React, Tailwind CSS, Monaco Editor, Zustand, React Hot Toast |
+| Backend | Node.js, Express.js, Socket.IO, JWT, Bcrypt |
+| Database | MongoDB, Cloudinary |
+| Real-time | Socket.IO, WebRTC, Yjs |
+| Deployment | Render, GitHub Actions |
 
-## ⚙️ Installation & Setup
 
-### Prerequisites
-- Node.js (v18+)
+
+# Installation & Setup
+
+## Prerequisites
+
+- Node.js (v18 or above)
 - MongoDB (Local or Atlas)
 - Cloudinary Account
 
-### 1. Clone the repository
-```bash
+## Clone the Repository
+
 git clone https://github.com/gopichandkuru/syncSpace.git
 cd syncSpace
-```
 
-### 2. Backend Setup
-```bash
+
+## Backend Setup
+
 cd server
 npm install
-```
-Create a `.env` file in the `server` directory:
-```env
+
+
+Create a `.env` file inside the `server` folder.
+
 PORT=5005
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_super_secret_jwt_key
 JWT_EXPIRES_IN=30d
 CLIENT_URL=http://localhost:5173
 
-# Cloudinary Setup
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
-```
-Start the backend server:
-```bash
-npm run dev
-```
 
-### 3. Frontend Setup
-```bash
+
+Start the backend:
+npm run dev
+
+
+## Frontend Setup
+
 cd ../client
 npm install
-```
-Create a `.env` file in the `client` directory:
-```env
+
+
+Create a `.env` file inside the `client` folder.
 VITE_API_URL=http://localhost:5005/api
 VITE_SOCKET_URL=http://localhost:5005
-```
-Start the frontend development server:
-```bash
+
+Start the frontend:
 npm run dev
-```
 
-## 📂 Folder Structure
-```text
+# Folder Structure
+
 syncSpace/
-├── client/                 # React Frontend (Vite)
-│   ├── public/             # Static Assets
+├── client/
+│   ├── public/
 │   └── src/
-│       ├── components/     # Reusable UI Components
-│       ├── context/        # React Context (Socket, etc.)
-│       ├── features/       # Feature Modules (Editor, Whiteboard, Video, etc.)
-│       ├── hooks/          # Custom React Hooks
-│       ├── services/       # Axios API integration
-│       └── store/          # Zustand State Stores
-├── server/                 # Node.js Backend
+│       ├── components/
+│       ├── context/
+│       ├── features/
+│       ├── hooks/
+│       ├── services/
+│       └── store/
+├── server/
 │   └── src/
-│       ├── config/         # DB & Cloudinary Configuration
-│       ├── controllers/    # Express Route Controllers
-│       ├── events/         # Socket.IO Event Constants
-│       ├── middlewares/    # Auth, Error Handling, File Uploads
-│       ├── models/         # Mongoose Schemas
-│       ├── routes/         # Express API Routes
-│       └── socket/         # WebSocket Room Management
-└── render.yaml             # Render Blueprint for Deployment
-```
+│       ├── config/
+│       ├── controllers/
+│       ├── events/
+│       ├── middlewares/
+│       ├── models/
+│       ├── routes/
+│       └── socket/
+└── render.yaml
 
-## 🚢 Deployment
-Both the frontend and backend are deployed automatically via Render using the `render.yaml` configuration.
-- Push to the `main` branch to trigger a production build.
-- Environment variables are securely managed in the Render Dashboard.
+# Contributors
 
-## 🤝 Contributors
-This project is actively maintained by:
-- **@yashvi-gangani** (Team Lead & Architect,Auth, WebRTC)
-- **@gopichandkuru** (Frontend Engineer, Database)
-- **@kunalkt5656** (Backend Engineer, Real-time)
-- **@malathi1945** (Database & Auth)
-- **@bhagyasree31** (Real-time & WebRTC)
+This project was developed as a group project by:
 
-## 🗺️ Roadmap
-- [x] JWT Authentication & Workspaces
-- [x] Monaco Editor & Yjs Sync
-- [x] Infinite Whiteboard
-- [x] File Sharing (PDF/Images)
-- [x] Code Execution Engine (Multi-language)
-- [x] Live HTML/CSS Preview
-- [ ] WebRTC Video & Audio (Ongoing)
-- [ ] Session Replay Polish
+- **Yashvi Gangani** – Team Lead, Authentication, WebRTC
+- **Gopichand Kuru** – Frontend Development, Database
+- **Kunal** – Backend Development, Real-Time Features
+- **Malathi** – Database & Authentication
+- **Bhagyasree** – Real-Time Features & WebRTC
 
----
-<div align="center">
-  <i>Built with ❤️ for the Axlero Solutions Advanced Engineering Program.</i>
-</div>
+# Roadmap / Future Enhancements
+
+### Completed
+- JWT Authentication & Workspaces
+- Monaco Editor & Yjs Sync
+- Infinite Whiteboard
+- File Sharing (PDF/Images)
+- Multi-language Code Execution
+- Live HTML/CSS Preview
+
+### In Progress
+- WebRTC Video & Audio Calling
+- Session Replay Improvements
+
+### Planned Features
+- Version History for Code and Whiteboard
+- Screen Sharing
+- Dark Mode
+- Room Activity Logs
+- Collaborative To-Do List
+- Better Notifications
+
+### AI Features (Future Work)
+- **AI Code Assistant** – Explain code, suggest improvements, detect bugs, and generate comments.
+- **AI Session Summary** – Generate a summary of discussions, code changes, and pending tasks after each collaboration session.
+- **AI Whiteboard Assistant** – Summarize whiteboard content and convert handwritten notes into organized text.
