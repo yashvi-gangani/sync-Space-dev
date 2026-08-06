@@ -16,7 +16,7 @@ const COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec
 
 function genId() { return Math.random().toString(36).slice(2, 9); }
 
-export default function WhiteboardPanel({ height = 500 }) {
+export default function WhiteboardPanel({ height = 600 }) {
   const { currentRoom } = useRoomStore();
   const { emitWhiteboardEvent, onCursorMove, emitCursorMove } = useSocket();
 
