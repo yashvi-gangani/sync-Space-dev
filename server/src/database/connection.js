@@ -28,7 +28,7 @@ const connectDB = async () => {
       setTimeout(connectDB, 5000);
     });
   } catch (err) {
-    console.error('❌ MongoDB connection failed:', err.message);
+    console.error('❌ MongoDB connection failed:', err.message); // if Any err ,it will be printed
     throw err;
   }
 };
