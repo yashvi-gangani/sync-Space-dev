@@ -10,8 +10,6 @@ import { authService } from './services/index';
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
 
-import { lazy, Suspense } from 'react';
-
 // Pages - Lazy Loaded
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
