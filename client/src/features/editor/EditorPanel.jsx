@@ -51,23 +51,24 @@ const TEMPLATES = {
 };
 
 /**
- * Piston API language map — exact identifiers verified from emkc.org/api/v2/piston/runtimes
- * Calling Piston directly from the browser avoids backend network issues on Render free tier.
+ * Wandbox API language map
+ * Calling Wandbox directly from the browser avoids backend network issues on Render free tier.
+ * Wandbox supports CORS from any origin without authentication.
  */
-const PISTON_LANG_MAP = {
-  javascript: { language: 'javascript', version: '18.15.0' },  // node runtime
-  typescript: { language: 'typescript', version: '5.0.3' },    // node-ts
-  python:     { language: 'python',     version: '3.10.0' },
-  java:       { language: 'java',       version: '15.0.2' },
-  cpp:        { language: 'c++',        version: '10.2.0' },    // alias: cpp, g++
-  c:          { language: 'c',          version: '10.2.0' },    // alias: gcc
-  csharp:     { language: 'csharp',     version: '6.12.0' },    // mono runtime
-  go:         { language: 'go',         version: '1.16.2' },
-  rust:       { language: 'rust',       version: '1.68.2' },
-  php:        { language: 'php',        version: '8.2.3' },
+const WANDBOX_COMPILER_MAP = {
+  javascript: 'nodejs-18.20.4',
+  typescript: 'typescript-5.6.2',
+  python:     'cpython-3.14.0',
+  java:       'openjdk-jdk-21+35',
+  c:          'gcc-head-c',
+  cpp:        'gcc-head',
+  csharp:     'dotnetcore-6.0.425',
+  go:         'go-1.14.15',
+  rust:       'rust-1.64.0',
+  php:        'php-5.6.40',
 };
 
-const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
+const WANDBOX_API = 'https://wandbox.org/api/compile.json';
 
 
 /**
@@ -426,8 +427,8 @@ export default function EditorPanel() {
       return;
     }
 
-    const pistonConfig = PISTON_LANG_MAP[language];
-    if (!pistonConfig) {
+    const wandboxCompiler = WANDBOX_COMPILER_MAP[language];
+    if (!wandboxCompiler) {
       toast.error(`No execution runtime configured for ${language}.`);
       return;
     }
@@ -448,43 +449,37 @@ export default function EditorPanel() {
 
     const startTime = Date.now();
     try {
-      const res = await fetch(PISTON_API, {
+      const res = await fetch(WANDBOX_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language: pistonConfig.language,
-          version: pistonConfig.version,
-          files: [{ content: code }],
+          compiler: wandboxCompiler,
+          code: code,
+          save: false
         }),
       });
 
       if (!res.ok) {
-        throw new Error(`Piston API error: ${res.status} ${res.statusText}`);
+        throw new Error(`Wandbox API error: ${res.status} ${res.statusText}`);
       }
 
       const data = await res.json();
       const executionTime = Date.now() - startTime;
       const newOutput = [];
 
-      // Compile phase (C, C++, Java, Rust, Go, C#, etc.)
-      if (data.compile) {
-        if (data.compile.stderr) {
-          newOutput.push('[COMPILE ERROR]');
-          newOutput.push(...data.compile.stderr.split('\n').filter(Boolean));
-        } else if (data.compile.stdout) {
-          newOutput.push(...data.compile.stdout.split('\n').filter(Boolean));
-        }
+      // Compile phase (if there's compiler output or error)
+      if (data.compiler_message || data.compiler_error) {
+        newOutput.push('[COMPILE ERROR]');
+        newOutput.push(...(data.compiler_message || data.compiler_error).split('\n').filter(Boolean));
       }
 
       // Run phase
-      if (data.run) {
-        if (data.run.stdout) {
-          newOutput.push(...data.run.stdout.split('\n'));
-        }
-        if (data.run.stderr) {
-          newOutput.push('[RUNTIME ERROR]');
-          newOutput.push(...data.run.stderr.split('\n').filter(Boolean));
-        }
+      if (data.program_output || data.program_message) {
+        newOutput.push(...(data.program_output || data.program_message).split('\n'));
+      }
+      if (data.program_error) {
+        newOutput.push('[RUNTIME ERROR]');
+        newOutput.push(...data.program_error.split('\n').filter(Boolean));
       }
 
       if (newOutput.length === 0) {
@@ -512,7 +507,7 @@ export default function EditorPanel() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   const isHtml = language === 'html';
-  const isExecutable = Object.keys(PISTON_LANG_MAP).includes(language);
+  const isExecutable = Object.keys(WANDBOX_COMPILER_MAP).includes(language);
 
 
   return (
@@ -599,7 +594,7 @@ export default function EditorPanel() {
                 // Ctrl+Enter shortcut
                 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
                   const currentLang = useEditorStore.getState().language;
-                  if (Object.keys(PISTON_LANG_MAP).includes(currentLang)) {
+                  if (Object.keys(WANDBOX_COMPILER_MAP).includes(currentLang)) {
                     runCodeRef.current?.();
                   } else if (currentLang === 'html') {
                     handleRunHtml();
