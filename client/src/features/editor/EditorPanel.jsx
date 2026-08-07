@@ -29,26 +29,46 @@ const LANGUAGES = [
 
 const EXT = {
   javascript: 'js', typescript: 'ts', python: 'py', java: 'java',
-  cpp: 'cpp', c: 'c', csharp: 'cs', php: 'php', html: 'html', css: 'css', json: 'json', markdown: 'md',
-  rust: 'rs', go: 'go',
+  cpp: 'cpp', c: 'c', csharp: 'cs', php: 'php', html: 'html', css: 'css',
+  json: 'json', markdown: 'md', rust: 'rs', go: 'go',
 };
 
 const TEMPLATES = {
   javascript: 'console.log("Hello World");',
   typescript: 'console.log("Hello World");',
   python: 'print("Hello World")',
-  java: 'public class Main {\n    public static void main(String[] args){\n        System.out.println("Hello World");\n    }\n}',
-  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main(){\n    cout<<"Hello World";\n    return 0;\n}',
-  c: '#include <stdio.h>\n\nint main(){\n    printf("Hello World");\n    return 0;\n}',
-  csharp: 'using System;\n\nclass Program{\n    static void Main(){\n        Console.WriteLine("Hello World");\n    }\n}',
+  java: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello World");\n    }\n}',
+  cpp: '#include<bits/stdc++.h>\nusing namespace std;\n\nint main(){\n    cout<<"Hello World";\n    return 0;\n}',
+  c: '#include<stdio.h>\n\nint main(){\n    printf("Hello World");\n    return 0;\n}',
+  csharp: 'using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello World");\n    }\n}',
   php: '<?php\necho "Hello World";\n?>',
-  html: '<!DOCTYPE html>\n<html>\n<body>\n<h1>Hello World</h1>\n</body>\n</html>',
-  css: 'body{\n    margin:0;\n}',
-  json: '{\n  "message":"Hello World"\n}',
-  markdown: '# Hello World',
-  rust: 'fn main(){\n    println!("Hello World");\n}',
-  go: 'package main\n\nimport "fmt"\n\nfunc main(){\n    fmt.Println("Hello World")\n}',
+  html: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Hello World</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>',
+  css: 'body {\n    margin: 0;\n    font-family: sans-serif;\n}',
+  json: '{\n  "message": "Hello World"\n}',
+  markdown: '# Hello World\n\nWelcome to SyncSpace!',
+  rust: 'fn main() {\n    println!("Hello World");\n}',
+  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello World")\n}',
 };
+
+/**
+ * Piston API language map — exact identifiers verified from emkc.org/api/v2/piston/runtimes
+ * Calling Piston directly from the browser avoids backend network issues on Render free tier.
+ */
+const PISTON_LANG_MAP = {
+  javascript: { language: 'javascript', version: '18.15.0' },  // node runtime
+  typescript: { language: 'typescript', version: '5.0.3' },    // node-ts
+  python:     { language: 'python',     version: '3.10.0' },
+  java:       { language: 'java',       version: '15.0.2' },
+  cpp:        { language: 'c++',        version: '10.2.0' },    // alias: cpp, g++
+  c:          { language: 'c',          version: '10.2.0' },    // alias: gcc
+  csharp:     { language: 'csharp',     version: '6.12.0' },    // mono runtime
+  go:         { language: 'go',         version: '1.16.2' },
+  rust:       { language: 'rust',       version: '1.68.2' },
+  php:        { language: 'php',        version: '8.2.3' },
+};
+
+const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
+
 
 /**
  * Wraps raw code in a full HTML document with runtime error catching.
@@ -296,10 +316,34 @@ export default function EditorPanel() {
   useEffect(() => {
     if (!ydocRef.current || !editorRef.current || !awarenessRef.current) return;
     
-    // Use a language-specific text field in Yjs
+    // 1. Clean up old binding so we don't sync changes to the old language
+    if (bindingRef.current) {
+      bindingRef.current.destroy();
+      bindingRef.current = null;
+    }
+    
+    // 2. Get the Yjs text for the newly selected language
     const ytext = ydocRef.current.getText(`codestate_${language}`);
     
-    bindingRef.current?.destroy();
+    // 3. Initialize code if empty
+    let existingCode = ytext.toString();
+    
+    if (existingCode === '') {
+      const defaultTemplate = TEMPLATES[language] || '';
+      if (defaultTemplate) {
+        ydocRef.current.transact(() => { ytext.insert(0, defaultTemplate); }, 'local');
+        existingCode = defaultTemplate;
+      }
+    }
+    
+    // 4. Force the editor to display the code for this language BEFORE binding
+    // This prevents MonacoBinding from copying the previous language's code into the new ytext
+    if (editorRef.current.getValue() !== existingCode) {
+      editorRef.current.setValue(existingCode);
+      setEditorValue(existingCode);
+    }
+
+    // 5. Create new binding
     bindingRef.current = new MonacoBinding(
       ytext,
       editorRef.current.getModel(),
@@ -307,27 +351,29 @@ export default function EditorPanel() {
       awarenessRef.current
     );
     
-    if (ytext.toString().trim() === '') {
-      const defaultTemplate = TEMPLATES[language] || '';
-      if (defaultTemplate) {
-        ydocRef.current.transact(() => { ytext.insert(0, defaultTemplate); }, 'local');
-      }
-    }
-    
     return () => {
-      bindingRef.current?.destroy();
+      if (bindingRef.current) {
+        bindingRef.current.destroy();
+        bindingRef.current = null;
+      }
     }
   }, [language, editorReady]);
 
   // ── Editor change handler (typing indicators) ──────────────────────────
   const handleEditorChange = useCallback((value) => {
     setEditorValue(value ?? '');
-    emitTypingStart(currentRoom?._id);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    if (!typingTimeoutRef.current) {
+      emitTypingStart(currentRoom?._id);
+    } else {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
     typingTimeoutRef.current = setTimeout(() => {
       emitTypingStop(currentRoom?._id);
+      typingTimeoutRef.current = null;
     }, 2000);
-  }, [currentRoom?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentRoom?._id, emitTypingStart, emitTypingStop]);
 
   // ── Format document ─────────────────────────────────────────────────────
   const handleFormat = () => {
@@ -339,16 +385,6 @@ export default function EditorPanel() {
     const lang = e.target.value;
     setLanguage(lang);
     emitLanguageChange(currentRoom._id, lang);
-
-    if (ydocRef.current) {
-      const ytext = ydocRef.current.getText(`codestate_${lang}`);
-      if (ytext.toString().trim() === '') {
-        const tpl = TEMPLATES[lang] || '';
-        if (tpl) {
-          ydocRef.current.transact(() => { ytext.insert(0, tpl); }, 'local');
-        }
-      }
-    }
   };
 
   // ── Copy ────────────────────────────────────────────────────────────────
@@ -381,74 +417,88 @@ export default function EditorPanel() {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  // ── Code Runner (Piston API & Local JS fallback) ────────────────────────
+  // ── Code Runner — calls Piston API directly from browser ────────────────
+  // Piston (emkc.org) is a public API with CORS enabled, so we call it directly
+  // from the browser. This bypasses the backend and eliminates Render network failures.
   const handleRunCode = useCallback(async () => {
-    if (language === 'html' || language === 'css' || language === 'markdown' || language === 'json') {
+    if (['html', 'css', 'markdown', 'json'].includes(language)) {
       toast.error(`Code execution is not supported for ${language}.`);
       return;
     }
 
-    const val = editorRef.current ? editorRef.current.getValue() : '';
-    if (!val.trim()) {
+    const pistonConfig = PISTON_LANG_MAP[language];
+    if (!pistonConfig) {
+      toast.error(`No execution runtime configured for ${language}.`);
+      return;
+    }
+
+    const code = editorRef.current ? editorRef.current.getValue() : '';
+    if (!code.trim()) {
       toast.error('Editor is empty.');
       return;
     }
 
     setIsRunning(true);
     setShowConsole(true);
-    setOutput(['Running...', 'Compiling...', 'Executing...']);
-    
-    // Broadcast execution start
+    setOutput(['\u23f3 Submitting...', '\ud83d\udd04 Compiling...', '\u25b6 Executing...']);
+
     if (currentRoom?._id && isConnected) {
       emitCodeRun(currentRoom._id, language);
     }
 
     const startTime = Date.now();
     try {
-      // Call our backend execution API
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1');
-      const response = await fetch(`${API_URL}/execute`, {
+      const res = await fetch(PISTON_API, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language: language,
-          code: val
-        })
+          language: pistonConfig.language,
+          version: pistonConfig.version,
+          files: [{ content: code }],
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to execute code on server.');
+      if (!res.ok) {
+        throw new Error(`Piston API error: ${res.status} ${res.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await res.json();
       const executionTime = Date.now() - startTime;
-      
       const newOutput = [];
-      if (data.compile && data.compile.output) {
-        newOutput.push('[COMPILE OUTPUT]');
-        newOutput.push(...data.compile.output.split('\n'));
-      }
-      if (data.run && data.run.stderr) {
-        newOutput.push(`Runtime Error:\n${data.run.stderr}`);
-      }
-      if (data.run && data.run.stdout) {
-        newOutput.push(...data.run.stdout.split('\n'));
-      }
-      
-      if (newOutput.length === 0) {
-        newOutput.push('Code executed successfully with no output.');
+
+      // Compile phase (C, C++, Java, Rust, Go, C#, etc.)
+      if (data.compile) {
+        if (data.compile.stderr) {
+          newOutput.push('[COMPILE ERROR]');
+          newOutput.push(...data.compile.stderr.split('\n').filter(Boolean));
+        } else if (data.compile.stdout) {
+          newOutput.push(...data.compile.stdout.split('\n').filter(Boolean));
+        }
       }
 
+      // Run phase
+      if (data.run) {
+        if (data.run.stdout) {
+          newOutput.push(...data.run.stdout.split('\n'));
+        }
+        if (data.run.stderr) {
+          newOutput.push('[RUNTIME ERROR]');
+          newOutput.push(...data.run.stderr.split('\n').filter(Boolean));
+        }
+      }
+
+      if (newOutput.length === 0) {
+        newOutput.push('\u2705 Executed with no output.');
+      }
+      newOutput.push(`\n\u2705 Completed in ${executionTime}ms`);
       setOutput(newOutput);
 
-      // Broadcast execution output
       if (currentRoom?._id && isConnected) {
         emitCodeOutput(currentRoom._id, newOutput, language, executionTime);
       }
     } catch (err) {
-      const errOutput = [`Execution Failed: ${err.message}`];
+      console.error('Execution error:', err);
+      const errOutput = ['\u274c Execution Failed: ' + err.message];
       setOutput(errOutput);
       if (currentRoom?._id && isConnected) {
         emitCodeOutput(currentRoom._id, errOutput, language, Date.now() - startTime);
@@ -462,7 +512,8 @@ export default function EditorPanel() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   const isHtml = language === 'html';
-  const isExecutable = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(language);
+  const isExecutable = Object.keys(PISTON_LANG_MAP).includes(language);
+
 
   return (
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
@@ -548,8 +599,7 @@ export default function EditorPanel() {
                 // Ctrl+Enter shortcut
                 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
                   const currentLang = useEditorStore.getState().language;
-                  const isExecutableLang = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(currentLang);
-                  if (isExecutableLang) {
+                  if (Object.keys(PISTON_LANG_MAP).includes(currentLang)) {
                     runCodeRef.current?.();
                   } else if (currentLang === 'html') {
                     handleRunHtml();
@@ -590,11 +640,10 @@ export default function EditorPanel() {
                 ) : (
                   output.map((line, idx) => {
                     let cls = 'text-slate-300';
-                    if (line.startsWith('[ERROR]')) cls = 'text-red-400';
-                    else if (line.startsWith('[WARN]')) cls = 'text-yellow-400';
-                    else if (line.startsWith('[INFO]')) cls = 'text-blue-400';
+                    if (line.startsWith('\u274c') || line.startsWith('[COMPILE ERROR]') || line.startsWith('[RUNTIME ERROR]')) cls = 'text-red-400 font-semibold';
+                    else if (line.startsWith('\u2705')) cls = 'text-green-400 font-semibold';
+                    else if (line.startsWith('\u23f3') || line.startsWith('\ud83d\udd04') || line.startsWith('\u25b6')) cls = 'text-yellow-400';
                     else if (line.startsWith('=>')) cls = 'text-green-400 font-semibold';
-                    else if (line.startsWith('Runtime Error:')) cls = 'text-red-500 font-semibold border-l-2 border-red-500 pl-2 py-0.5 bg-red-950/10';
                     return (
                       <div key={idx} className={`${cls} whitespace-pre-wrap leading-relaxed`}>{line}</div>
                     );
