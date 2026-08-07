@@ -17,7 +17,7 @@ const LANGUAGES = [
   { value: 'java', label: 'Java' },
   { value: 'cpp', label: 'C++' },
   { value: 'c', label: 'C' },
-  { value: 'csharp', label: 'C#' },
+
   { value: 'php', label: 'PHP' },
   { value: 'html', label: 'HTML' },
   { value: 'css', label: 'CSS' },
@@ -29,7 +29,7 @@ const LANGUAGES = [
 
 const EXT = {
   javascript: 'js', typescript: 'ts', python: 'py', java: 'java',
-  cpp: 'cpp', c: 'c', csharp: 'cs', php: 'php', html: 'html', css: 'css',
+  cpp: 'cpp', c: 'c', php: 'php', html: 'html', css: 'css',
   json: 'json', markdown: 'md', rust: 'rs', go: 'go',
 };
 
@@ -40,7 +40,7 @@ const TEMPLATES = {
   java: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello World");\n    }\n}',
   cpp: '#include<bits/stdc++.h>\nusing namespace std;\n\nint main(){\n    cout<<"Hello World";\n    return 0;\n}',
   c: '#include<stdio.h>\n\nint main(){\n    printf("Hello World");\n    return 0;\n}',
-  csharp: 'using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello World");\n    }\n}',
+
   php: '<?php\necho "Hello World";\n?>',
   html: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Hello World</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>',
   css: 'body {\n    margin: 0;\n    font-family: sans-serif;\n}',
@@ -62,7 +62,7 @@ const WANDBOX_COMPILER_MAP = {
   java:       'openjdk-jdk-21+35',
   c:          'gcc-head-c',
   cpp:        'gcc-head',
-  csharp:     'dotnetcore-6.0.425',
+
   go:         'go-1.14.15',
   rust:       'rust-1.64.0',
   php:        'php-5.6.40',
