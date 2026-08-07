@@ -14,7 +14,7 @@ export const useRoomStore = create((set) => ({
   setMembers: (members) => set({ members }),
   setCurrentSession: (session) => set({ currentSession: session }),
 
-  addRoom: (room) => set((state) => ({ rooms: [room, ...state.rooms] })),
+  addRoom: (room) => set((state) => ({ rooms: [room, ...state.rooms], myRooms: [room, ...state.myRooms] })),
   updateRoom: (id, updates) => set((state) => ({
     rooms: state.rooms.map((r) => (r._id === id ? { ...r, ...updates } : r)),
     myRooms: state.myRooms.map((r) => (r._id === id ? { ...r, ...updates } : r)),

@@ -1,22 +1,20 @@
 const axios = require('axios');
 
-// Map frontend languages to Wandbox compiler names
-const compilerMap = {
-  javascript: 'nodejs-18.20.4',
-  typescript: 'typescript-5.6.2',
-  python: 'cpython-3.14.0',
-  java: 'openjdk-jdk-21+35',
-  c: 'gcc-head-c',
-  cpp: 'gcc-head',
-  csharp: 'dotnetcore-6.0.425',
-  go: 'go-1.14.15',
-  rust: 'rust-1.64.0',
-  php: 'php-5.6.40',
-  'node.js': 'nodejs-18.20.4'
+const pistonLanguageMap = {
+  javascript: 'javascript',
+  typescript: 'typescript',
+  python: 'python',
+  java: 'java',
+  c: 'c',
+  cpp: 'c++',
+  csharp: 'csharp',
+  go: 'go',
+  rust: 'rust',
+  php: 'php'
 };
 
 /**
- * Execute code using Wandbox API
+ * Execute code using Piston API
  * @route POST /api/v1/execute
  */
 exports.executeCode = async (req, res, next) => {
@@ -30,20 +28,24 @@ exports.executeCode = async (req, res, next) => {
       });
     }
 
-    const compiler = compilerMap[language.toLowerCase()];
+    const pistonLang = pistonLanguageMap[language.toLowerCase()];
     
-    if (!compiler) {
+    if (!pistonLang) {
       return res.status(400).json({
         success: false,
         message: `Unsupported language: ${language}`
       });
     }
 
-    // Call Wandbox API
-    const response = await axios.post('https://wandbox.org/api/compile.json', {
-      compiler: compiler,
-      code: code,
-      save: false
+    // Call Piston API
+    const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
+      language: pistonLang,
+      version: '*',
+      files: [
+        {
+          content: code
+        }
+      ]
     });
 
     const data = response.data;
@@ -51,11 +53,11 @@ exports.executeCode = async (req, res, next) => {
     res.status(200).json({
       success: true,
       compile: {
-        output: data.compiler_message || data.compiler_error || ''
+        output: data.compile?.output || ''
       },
       run: {
-        stdout: data.program_message || data.program_output || '',
-        stderr: data.program_error || ''
+        stdout: data.run?.stdout || '',
+        stderr: data.run?.stderr || ''
       },
       data: data
     });

@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { SocketProvider } from './context/SocketContext';
 import { useAuthStore } from './store/authStore';
 import { useUIStore } from './store/uiStore';
@@ -27,7 +27,6 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 const ReplayPage = lazy(() => import('./pages/ReplayPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
-
 const PageLoader = () => (
   <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'rgb(var(--surface-950))' }}>
     <div className="w-10 h-10 border-4 border-primary-600/30 border-t-primary-600 rounded-full animate-spin" />

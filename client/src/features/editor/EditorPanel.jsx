@@ -34,20 +34,20 @@ const EXT = {
 };
 
 const TEMPLATES = {
-  javascript: 'console.log("Hello World");\n',
-  typescript: 'console.log("Hello TypeScript");\n',
-  python: 'print("Hello World")\n',
-  java: 'class Main{\n  public static void main(String args[]){\n    System.out.println("Hello World");\n  }\n}\n',
-  cpp: '#include<bits/stdc++.h>\nusing namespace std;\n\nint main(){\n  cout << "Hello World";\n  return 0;\n}\n',
-  c: '#include <stdio.h>\n\nint main() {\n  printf("Hello World\\n");\n  return 0;\n}\n',
-  csharp: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hello World");\n  }\n}\n',
-  php: '<?php\n\necho "Hello World\\n";\n',
-  html: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Live Preview</title>\n  <style>\n    body {\n      font-family: system-ui, sans-serif;\n      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n      min-height: 100vh;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      margin: 0;\n    }\n    .card {\n      background: white;\n      border-radius: 16px;\n      padding: 40px;\n      text-align: center;\n      box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n    }\n    h1 { color: #764ba2; margin: 0 0 8px; }\n    p { color: #666; margin: 0; }\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h1>Hello, SyncSpace! 🚀</h1>\n    <p>Start editing to see changes live.</p>\n  </div>\n\n  <script>\n    console.log("Preview loaded!");\n  </script>\n</body>\n</html>\n',
-  css: 'body {\n  margin: 0;\n  padding: 0;\n}\n',
-  json: '{\n  "key": "value"\n}\n',
-  markdown: '# Hello World\n',
-  rust: 'fn main() {\n    println!("Hello World");\n}\n',
-  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello World")\n}\n',
+  javascript: 'console.log("Hello World");',
+  typescript: 'console.log("Hello World");',
+  python: 'print("Hello World")',
+  java: 'public class Main {\n    public static void main(String[] args){\n        System.out.println("Hello World");\n    }\n}',
+  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main(){\n    cout<<"Hello World";\n    return 0;\n}',
+  c: '#include <stdio.h>\n\nint main(){\n    printf("Hello World");\n    return 0;\n}',
+  csharp: 'using System;\n\nclass Program{\n    static void Main(){\n        Console.WriteLine("Hello World");\n    }\n}',
+  php: '<?php\necho "Hello World";\n?>',
+  html: '<!DOCTYPE html>\n<html>\n<body>\n<h1>Hello World</h1>\n</body>\n</html>',
+  css: 'body{\n    margin:0;\n}',
+  json: '{\n  "message":"Hello World"\n}',
+  markdown: '# Hello World',
+  rust: 'fn main(){\n    println!("Hello World");\n}',
+  go: 'package main\n\nimport "fmt"\n\nfunc main(){\n    fmt.Println("Hello World")\n}',
 };
 
 /**
@@ -203,6 +203,7 @@ export default function EditorPanel() {
         setShowConsole(true);
         setIsRunning(false);
         const finalOutput = [...newOutput];
+        finalOutput.push('\nCompleted');
         if (executionTime) {
           finalOutput.push(`\n[Execution time: ${executionTime}ms]`);
         }
@@ -227,24 +228,14 @@ export default function EditorPanel() {
     }
   }, [currentRoom?._id, isConnected, emitPreviewSync]);
 
-  // ── Yjs setup ──────────────────────────────────────────────────────────
+  // ── Yjs Doc & Socket setup ─────────────────────────────────────────────
   useEffect(() => {
     if (!currentRoom || !editorReady || !editorRef.current) return;
 
     const doc = new Y.Doc();
     ydocRef.current = doc;
-    const ytext = doc.getText('codestate');
-
     const awareness = new Awareness(doc);
     awarenessRef.current = awareness;
-
-    // Bind Monaco ↔ Yjs
-    bindingRef.current = new MonacoBinding(
-      ytext,
-      editorRef.current.getModel(),
-      new Set([editorRef.current]),
-      awareness
-    );
 
     // Send state vector to get current document state
     const stateVector = Y.encodeStateVector(doc);
@@ -273,12 +264,6 @@ export default function EditorPanel() {
       if (type === 'update' && data?.length) {
         try {
           Y.applyUpdate(doc, new Uint8Array(data), 'socket');
-          if (ytext.toString() === '') {
-            const defaultTemplate = TEMPLATES[language] || '';
-            if (defaultTemplate) {
-              doc.transact(() => { ytext.insert(0, defaultTemplate); }, 'local');
-            }
-          }
         } catch (e) { console.warn('Yjs sync error:', e); }
       }
     });
@@ -302,11 +287,37 @@ export default function EditorPanel() {
       doc.off('update', handleLocalUpdate);
       awareness.off('update', handleAwarenessUpdate);
       cleanSync(); cleanUpdate(); cleanAwareness(); cleanLang();
-      bindingRef.current?.destroy();
       doc.destroy();
       clearTimeout(saveTimer.current);
     };
   }, [currentRoom?._id, isConnected, editorReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Monaco Binding per Language ────────────────────────────────────────
+  useEffect(() => {
+    if (!ydocRef.current || !editorRef.current || !awarenessRef.current) return;
+    
+    // Use a language-specific text field in Yjs
+    const ytext = ydocRef.current.getText(`codestate_${language}`);
+    
+    bindingRef.current?.destroy();
+    bindingRef.current = new MonacoBinding(
+      ytext,
+      editorRef.current.getModel(),
+      new Set([editorRef.current]),
+      awarenessRef.current
+    );
+    
+    if (ytext.toString().trim() === '') {
+      const defaultTemplate = TEMPLATES[language] || '';
+      if (defaultTemplate) {
+        ydocRef.current.transact(() => { ytext.insert(0, defaultTemplate); }, 'local');
+      }
+    }
+    
+    return () => {
+      bindingRef.current?.destroy();
+    }
+  }, [language, editorReady]);
 
   // ── Editor change handler (typing indicators) ──────────────────────────
   const handleEditorChange = useCallback((value) => {
@@ -330,7 +341,7 @@ export default function EditorPanel() {
     emitLanguageChange(currentRoom._id, lang);
 
     if (ydocRef.current) {
-      const ytext = ydocRef.current.getText('codestate');
+      const ytext = ydocRef.current.getText(`codestate_${lang}`);
       if (ytext.toString().trim() === '') {
         const tpl = TEMPLATES[lang] || '';
         if (tpl) {
@@ -385,7 +396,7 @@ export default function EditorPanel() {
 
     setIsRunning(true);
     setShowConsole(true);
-    setOutput(['Executing code...']);
+    setOutput(['Running...', 'Compiling...', 'Executing...']);
     
     // Broadcast execution start
     if (currentRoom?._id && isConnected) {
