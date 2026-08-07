@@ -469,7 +469,11 @@ export default function EditorPanel() {
 
       // Compile phase (if there's compiler output or error)
       if (data.compiler_message || data.compiler_error) {
-        newOutput.push('[COMPILE ERROR]');
+        if (data.status !== '0' && !data.program_output) {
+          newOutput.push('[COMPILE ERROR]');
+        } else {
+          newOutput.push('[COMPILE OUTPUT]');
+        }
         newOutput.push(...(data.compiler_message || data.compiler_error).split('\n').filter(Boolean));
       }
 
@@ -636,6 +640,7 @@ export default function EditorPanel() {
                   output.map((line, idx) => {
                     let cls = 'text-slate-300';
                     if (line.startsWith('\u274c') || line.startsWith('[COMPILE ERROR]') || line.startsWith('[RUNTIME ERROR]')) cls = 'text-red-400 font-semibold';
+                    else if (line.startsWith('[COMPILE OUTPUT]')) cls = 'text-slate-500 text-[10px]';
                     else if (line.startsWith('\u2705')) cls = 'text-green-400 font-semibold';
                     else if (line.startsWith('\u23f3') || line.startsWith('\ud83d\udd04') || line.startsWith('\u25b6')) cls = 'text-yellow-400';
                     else if (line.startsWith('=>')) cls = 'text-green-400 font-semibold';
