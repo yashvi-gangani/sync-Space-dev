@@ -9,7 +9,7 @@ const authLimiter = rateLimit({
 });
 
 const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
+  windowMs: 1 * 60 * 1000,    //if ok
   max: 100,
   message: { success: false, message: 'Rate limit exceeded.' },
   standardHeaders: true,
