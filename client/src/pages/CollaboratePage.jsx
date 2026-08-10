@@ -57,6 +57,16 @@ export default function CollaboratePage() {
   const containerRef = useRef(null);
   const joinedRef = useRef(false); // prevent double-join
 
+  const cleanupMeetingMedia = () => {
+  const {
+    localStream,
+    localScreenStream,
+  } = useMeetingStore.getState();
+
+  localStream?.getTracks().forEach((track) => track.stop());
+  localScreenStream?.getTracks().forEach((track) => track.stop());
+};
+
   // ── Step 1: Load room + create/find session ─────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -213,9 +223,10 @@ export default function CollaboratePage() {
   // ── Meeting & Screen Share Actions ───────────────────────────────────────
   const handleToggleMeeting = async () => {
     if (isInMeeting) {
-      emitMeetingLeave(currentRoom?._id);
-      clearMeeting();
-    } else {
+  cleanupMeetingMedia();
+  emitMeetingLeave(currentRoom?._id);
+  clearMeeting();
+} else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setMeetingState({ isInMeeting: true, localStream: stream });
@@ -252,14 +263,27 @@ export default function CollaboratePage() {
         setMeetingState({ isScreenSharing: true, localScreenStream: stream });
         emitScreenShareStart(currentRoom?._id);
         stream.getVideoTracks()[0].onended = () => {
-          setMeetingState({ isScreenSharing: false, localScreenStream: null });
-          emitScreenShareStop(currentRoom?._id);
-        };
+  stream.getTracks().forEach((track) => track.stop());
+  setMeetingState({
+    isScreenSharing: false,
+    localScreenStream: null
+  });
+  emitScreenShareStop(currentRoom?._id);
+};
       } catch (err) {
         toast.error('Screen sharing cancelled.');
       }
     }
   };
+
+  useEffect(() => {
+  return () => {
+    if (isInMeeting) {
+      cleanupMeetingMedia();
+      emitMeetingLeave(currentRoom?._id);
+    }
+  };
+}, [isInMeeting, currentRoom?._id, emitMeetingLeave]);
 
   // ── Loading screen ───────────────────────────────────────────────────────
   if (loading) {
