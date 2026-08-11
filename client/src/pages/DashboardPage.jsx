@@ -8,6 +8,7 @@ import JoinRoomModal from '../components/dashboard/JoinRoomModal';
 import {
   TbPlus, TbSearch, TbCompass, TbClock, TbUsers, TbLock, TbLockOpen,
   TbArrowRight, TbLayoutColumns, TbBrush, TbCode, TbBolt, TbMail, TbCheck,
+  TbStar, TbStarFilled
 } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
@@ -42,6 +43,28 @@ export default function DashboardPage() {
   const [joinOpen, setJoinOpen] = useState(false);
   const [activity, setActivity] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
+
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('starred_rooms') || '[]');
+    } catch (_) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('starred_rooms', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (roomId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFavorites(prev => 
+      prev.includes(roomId) 
+        ? prev.filter(id => id !== roomId) 
+        : [...prev, roomId]
+    );
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -171,25 +194,40 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myRooms.map((room) => (
-                <div key={room._id} className="card p-5 hover:border-primary-500/50 hover:shadow-lg transition-all group flex flex-col justify-between h-44">
-                  {/* Room header */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white group-hover:text-primary-400 transition-colors truncate pr-2">
-                        {room.name}
-                      </h3>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {room.type === 'public'
-                          ? <TbLockOpen size={14} className="text-green-400" />
-                          : <TbLock size={14} className="text-yellow-400" />
-                        }
+              {[...myRooms]
+                .sort((a, b) => {
+                  const aFav = favorites.includes(a._id) ? 1 : 0;
+                  const bFav = favorites.includes(b._id) ? 1 : 0;
+                  return bFav - aFav; // Starred rooms first
+                })
+                .map((room) => {
+                  const isFav = favorites.includes(room._id);
+                  return (
+                    <div key={room._id} className="card p-5 hover:border-primary-500/50 hover:shadow-lg transition-all group flex flex-col justify-between h-44">
+                      {/* Room header */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-white group-hover:text-primary-400 transition-colors truncate pr-2">
+                            {room.name}
+                          </h3>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={(e) => toggleFavorite(room._id, e)}
+                              title={isFav ? "Unpin Workspace" : "Pin Workspace"}
+                              className={`p-1 rounded-md transition-all hover:bg-surface-700 ${isFav ? 'text-yellow-400' : 'text-surface-450 hover:text-yellow-400'}`}
+                            >
+                              {isFav ? <TbStarFilled size={15} /> : <TbStar size={15} />}
+                            </button>
+                            {room.type === 'public'
+                              ? <TbLockOpen size={14} className="text-green-400" />
+                              : <TbLock size={14} className="text-yellow-400" />
+                            }
+                          </div>
+                        </div>
+                        <p className="text-xs text-surface-450 line-clamp-2">
+                          {room.description || 'No description provided.'}
+                        </p>
                       </div>
-                    </div>
-                    <p className="text-xs text-surface-450 line-clamp-2">
-                      {room.description || 'No description provided.'}
-                    </p>
-                  </div>
 
                   {/* Stats + CTA */}
                   <div className="space-y-2.5">
@@ -218,7 +256,8 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
         </div>
