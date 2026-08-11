@@ -4,7 +4,7 @@ import * as Y from 'yjs';
 import { useSocket } from '../../context/SocketContext';
 import { useRoomStore } from '../../store/roomStore';
 import { useEditorStore } from '../../store/editorStore';
-import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay, TbRefresh, TbExternalLink } from 'react-icons/tb';
+import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay, TbRefresh, TbExternalLink, TbTerminal } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 import { MonacoBinding } from 'y-monaco';
 import { Awareness } from 'y-protocols/awareness';
@@ -361,6 +361,45 @@ export default function EditorPanel() {
     URL.revokeObjectURL(a.href);
   };
 
+  // ── Terminal Shell Command Handler ──────────────────────────────────────
+  const [terminalInput, setTerminalInput] = useState('');
+
+  const handleTerminalSubmit = (e) => {
+    if (e.key === 'Enter') {
+      const cmd = terminalInput.trim();
+      if (!cmd) return;
+
+      let newOutput = [...output];
+      newOutput.push(`guest@syncspace:~$ ${cmd}`);
+
+      if (cmd === 'clear') {
+        setOutput([]);
+        setTerminalInput('');
+        return;
+      }
+
+      if (cmd === 'help') {
+        newOutput.push('Available Shell Commands:');
+        newOutput.push('  run    - Execute the code currently in the editor');
+        newOutput.push('  clear  - Clear the console terminal screen');
+        newOutput.push('  system - Display system connection and mode variables');
+        newOutput.push('  help   - Display this shell command manual');
+      } else if (cmd === 'run') {
+        handleRunCode();
+      } else if (cmd === 'system') {
+        newOutput.push(`SyncSpace Development Server v1.0.0`);
+        newOutput.push(`Connection: ${isConnected ? 'CONNECTED' : 'DISCONNECTED'}`);
+        newOutput.push(`Language Config: ${language}`);
+        newOutput.push(`Theme Style: ${editorTheme}`);
+      } else {
+        newOutput.push(`bash: ${cmd}: command not found`);
+      }
+
+      setOutput(newOutput);
+      setTerminalInput('');
+    }
+  };
+
   // ── Open preview in new tab ─────────────────────────────────────────────
   const handleOpenPreviewTab = () => {
     const html = previewHtml || buildPreviewDocument(editorRef.current?.getValue() || '');
@@ -513,6 +552,9 @@ export default function EditorPanel() {
           <button onClick={handleDownload} title="Download file" className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors">
             <TbDownload size={15} />
           </button>
+          <button onClick={() => setShowConsole(!showConsole)} title="Toggle Console Terminal" className={`p-1.5 rounded transition-colors ${showConsole ? 'text-green-400 bg-surface-700' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}>
+            <TbTerminal size={15} />
+          </button>
         </div>
       </div>
 
@@ -566,8 +608,8 @@ export default function EditorPanel() {
           {/* Console output (JS runner) */}
           {showConsole && (
             <div className="h-44 border-t border-slate-800 bg-[#070b13] flex flex-col flex-shrink-0 text-white font-mono text-[11px]">
-              <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Output</span>
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800 flex-shrink-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Terminal</span>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setOutput([])} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 hover:text-white rounded text-[10px] text-slate-450 transition-colors">Clear</button>
                   <button onClick={() => setShowConsole(false)} className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900/30 hover:text-red-300 rounded text-[10px] text-red-400 transition-colors">Close</button>
@@ -575,7 +617,7 @@ export default function EditorPanel() {
               </div>
               <div className="flex-1 p-3 overflow-y-auto space-y-1 select-text selection:bg-indigo-500/30">
                 {output.length === 0 ? (
-                  <div className="text-slate-500 italic">No output. Click "Run" to execute the code.</div>
+                  <div className="text-slate-500 italic">No output. Click "Run" or type 'run' below.</div>
                 ) : (
                   output.map((line, idx) => {
                     let cls = 'text-slate-300';
@@ -584,11 +626,24 @@ export default function EditorPanel() {
                     else if (line.startsWith('[INFO]')) cls = 'text-blue-400';
                     else if (line.startsWith('=>')) cls = 'text-green-400 font-semibold';
                     else if (line.startsWith('Runtime Error:')) cls = 'text-red-500 font-semibold border-l-2 border-red-500 pl-2 py-0.5 bg-red-950/10';
+                    else if (line.startsWith('guest@syncspace:~$')) cls = 'text-blue-400 font-bold';
                     return (
                       <div key={idx} className={`${cls} whitespace-pre-wrap leading-relaxed`}>{line}</div>
                     );
                   })
                 )}
+              </div>
+              {/* Interactive terminal command input */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-slate-900 bg-[#04060b] flex-shrink-0 text-slate-300">
+                <span className="text-green-400 font-semibold flex-shrink-0 select-none">guest@syncspace:~$</span>
+                <input
+                  type="text"
+                  value={terminalInput}
+                  onChange={(e) => setTerminalInput(e.target.value)}
+                  onKeyDown={handleTerminalSubmit}
+                  className="flex-1 bg-transparent border-none outline-none text-white font-mono text-[11px] p-0 focus:ring-0"
+                  placeholder="Type 'help' or command..."
+                />
               </div>
             </div>
           )}
