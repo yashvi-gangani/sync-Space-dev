@@ -1,40 +1,58 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
-import { useAuthStore } from '../store/authStore';
-import { useRoomStore } from '../store/roomStore';
-import { useChatStore } from '../store/chatStore';
-import { useNotificationStore } from '../store/notificationStore';
-import { usePresenceStore } from '../store/notificationStore';
-import { useWhiteboardStore } from '../store/whiteboardStore';
-import { useMeetingStore } from '../store/meetingStore';
-import { useDocumentStore } from '../store/documentStore';
-import { useFileStore } from '../store/fileStore';
-import toast from 'react-hot-toast';
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
+import { useAuthStore } from "../store/authStore";
+import { useRoomStore } from "../store/roomStore";
+import { useChatStore } from "../store/chatStore";
+import { useNotificationStore } from "../store/notificationStore";
+import { usePresenceStore } from "../store/notificationStore";
+import { useWhiteboardStore } from "../store/whiteboardStore";
+import { useMeetingStore } from "../store/meetingStore";
+import { useDocumentStore } from "../store/documentStore";
+import { useFileStore } from "../store/fileStore";
+import toast from "react-hot-toast";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com' : 'http://localhost:5005');
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  (import.meta.env.PROD
+    ? "https://syncspace-backend-44cl.onrender.com"
+    : "http://localhost:5005");
 
 const SocketContext = createContext(null);
 
 const EVENTS = {
-  ROOM_JOIN: 'room:join', ROOM_LEAVE: 'room:leave', ROOM_JOINED: 'room:joined',
-  ROOM_ERROR: 'room:error', USER_ONLINE: 'user:online', USER_OFFLINE: 'user:offline',
-  CURSOR_MOVE: 'cursor:move', CURSOR_LEAVE: 'cursor:leave',
-  TYPING_START: 'typing:start', TYPING_STOP: 'typing:stop',
-  WHITEBOARD_EVENT: 'whiteboard:event', WHITEBOARD_CLEAR: 'whiteboard:clear',
-  EDITOR_YJS_SYNC: 'editor:yjs:sync', EDITOR_YJS_UPDATE: 'editor:yjs:update',
-  EDITOR_YJS_AWARENESS: 'editor:yjs:awareness', EDITOR_LANGUAGE_CHANGE: 'editor:language_change',
-  CHAT_MESSAGE: 'chat:message', CHAT_MESSAGE_DELETED: 'chat:message_deleted', CHAT_SEEN: 'chat:seen',
-  NOTIFICATION: 'notification',
-  DOCUMENT_CREATED: 'document:created', FILE_CREATED: 'file:created',
-  PREVIEW_SYNC: 'preview:sync',
-  CODE_RUN: 'code:run', CODE_OUTPUT: 'code:output',
+  ROOM_JOIN: "room:join",
+  ROOM_LEAVE: "room:leave",
+  ROOM_JOINED: "room:joined",
+  ROOM_ERROR: "room:error",
+  USER_ONLINE: "user:online",
+  USER_OFFLINE: "user:offline",
+  CURSOR_MOVE: "cursor:move",
+  CURSOR_LEAVE: "cursor:leave",
+  TYPING_START: "typing:start",
+  TYPING_STOP: "typing:stop",
+  WHITEBOARD_EVENT: "whiteboard:event",
+  WHITEBOARD_CLEAR: "whiteboard:clear",
+  EDITOR_YJS_SYNC: "editor:yjs:sync",
+  EDITOR_YJS_UPDATE: "editor:yjs:update",
+  EDITOR_YJS_AWARENESS: "editor:yjs:awareness",
+  EDITOR_LANGUAGE_CHANGE: "editor:language_change",
+  CHAT_MESSAGE: "chat:message",
+  CHAT_MESSAGE_DELETED: "chat:message_deleted",
+  CHAT_SEEN: "chat:seen",
+  NOTIFICATION: "notification",
+  DOCUMENT_CREATED: "document:created",
+  FILE_CREATED: "file:created",
+  PREVIEW_SYNC: "preview:sync",
+  CODE_RUN: "code:run",
+  CODE_OUTPUT: "code:output",
 };
 
 export function SocketProvider({ children }) {
   const socketRef = useRef(null);
   const { accessToken, isAuthenticated } = useAuthStore();
   const { setMembers, addMember, removeMember } = useRoomStore();
-  const { addMessage, removeMessage, addTypingUser, removeTypingUser } = useChatStore();
+  const { addMessage, removeMessage, addTypingUser, removeTypingUser } =
+    useChatStore();
   const { addNotification } = useNotificationStore();
   const applyRemoteEvent = useWhiteboardStore((s) => s.applyRemoteEvent);
   const [isConnected, setIsConnected] = useState(false);
@@ -47,20 +65,28 @@ export function SocketProvider({ children }) {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       forceNew: true,
     });
 
     socketRef.current = socket;
 
-    socket.on('connect', () => { setIsConnected(true); console.log('🔌 Socket connected'); });
-    socket.on('disconnect', () => { setIsConnected(false); });
-    socket.on('connect_error', async (err) => { 
-      console.error('Socket error:', err.message); 
-      if (err.message === 'Invalid token' || err.message === 'Authentication required') {
+    socket.on("connect", () => {
+      setIsConnected(true);
+      console.log("🔌 Socket connected");
+    });
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+    });
+    socket.on("connect_error", async (err) => {
+      console.error("Socket error:", err.message);
+      if (
+        err.message === "Invalid token" ||
+        err.message === "Authentication required"
+      ) {
         // Trigger the axios interceptor to refresh the token
         try {
-          const { authService } = await import('../services/index.js');
+          const { authService } = await import("../services/index.js");
           await authService.getMe();
         } catch (e) {
           useAuthStore.getState().logout();
@@ -68,47 +94,86 @@ export function SocketProvider({ children }) {
       }
     });
 
-    socket.on(EVENTS.ROOM_JOINED, ({ room, members, whiteboardState, chatHistory, activeMeetingParticipants, activeScreenSharers }) => {
-      setMembers(members);
-      if (whiteboardState?.length) {
-        useWhiteboardStore.getState().setInitialState(whiteboardState);
-      }
-      if (chatHistory?.length) {
-        useChatStore.getState().setMessages(chatHistory);
-      }
-      if (activeMeetingParticipants?.length) {
-        activeMeetingParticipants.forEach((id) => {
-          if (id !== useAuthStore.getState().user?.id) {
-            useMeetingStore.getState().addParticipant({ id });
-          }
-        });
-      }
-      if (activeScreenSharers?.length) {
-        activeScreenSharers.forEach((id) => {
-          if (id !== useAuthStore.getState().user?.id) {
-            useMeetingStore.getState().addParticipant({ id, isSharingScreen: true });
-          }
-        });
-      }
+    socket.on(
+      EVENTS.ROOM_JOINED,
+      ({
+        room,
+        members,
+        whiteboardState,
+        chatHistory,
+        activeMeetingParticipants,
+        activeScreenSharers,
+      }) => {
+        setMembers(members);
+        if (whiteboardState?.length) {
+          useWhiteboardStore.getState().setInitialState(whiteboardState);
+        }
+        if (chatHistory?.length) {
+          useChatStore.getState().setMessages(chatHistory);
+        }
+        if (activeMeetingParticipants?.length) {
+          activeMeetingParticipants.forEach((id) => {
+            if (id !== useAuthStore.getState().user?.id) {
+              useMeetingStore.getState().addParticipant({ id });
+            }
+          });
+        }
+        if (activeScreenSharers?.length) {
+          activeScreenSharers.forEach((id) => {
+            if (id !== useAuthStore.getState().user?.id) {
+              useMeetingStore
+                .getState()
+                .addParticipant({ id, isSharingScreen: true });
+            }
+          });
+        }
+      },
+    );
+
+socket.on(
+  EVENTS.MEETING_MEDIA_STATE,
+  ({ userId, audioEnabled, videoEnabled }) => {
+    useMeetingStore.getState().addParticipant({
+      id: userId,
+      audioEnabled,
+      videoEnabled,
     });
+  },
+);
 
     socket.on(EVENTS.ROOM_ERROR, ({ message }) => toast.error(message));
 
-    socket.on(EVENTS.USER_ONLINE, ({ user, members }) => { if (members) setMembers(members); });
-    socket.on(EVENTS.USER_OFFLINE, ({ userId, members }) => { if (members) setMembers(members); });
+    socket.on(EVENTS.USER_ONLINE, ({ user, members }) => {
+      if (members) setMembers(members);
+    });
+    socket.on(EVENTS.USER_OFFLINE, ({ userId, members }) => {
+      if (members) setMembers(members);
+    });
 
-    socket.on(EVENTS.WHITEBOARD_EVENT, ({ event }) => { applyRemoteEvent(event); });
-    socket.on(EVENTS.WHITEBOARD_CLEAR, () => { useWhiteboardStore.getState().clearCanvas(); });
+    socket.on(EVENTS.WHITEBOARD_EVENT, ({ event }) => {
+      applyRemoteEvent(event);
+    });
+    socket.on(EVENTS.WHITEBOARD_CLEAR, () => {
+      useWhiteboardStore.getState().clearCanvas();
+    });
 
-    socket.on(EVENTS.CHAT_MESSAGE, ({ message }) => { addMessage(message); });
-    socket.on(EVENTS.CHAT_MESSAGE_DELETED, ({ id }) => { removeMessage(id); });
+    socket.on(EVENTS.CHAT_MESSAGE, ({ message }) => {
+      addMessage(message);
+    });
+    socket.on(EVENTS.CHAT_MESSAGE_DELETED, ({ id }) => {
+      removeMessage(id);
+    });
 
-    socket.on(EVENTS.TYPING_START, (user) => { addTypingUser(user); });
-    socket.on(EVENTS.TYPING_STOP, ({ userId }) => { removeTypingUser(userId); });
+    socket.on(EVENTS.TYPING_START, (user) => {
+      addTypingUser(user);
+    });
+    socket.on(EVENTS.TYPING_STOP, ({ userId }) => {
+      removeTypingUser(userId);
+    });
 
     socket.on(EVENTS.NOTIFICATION, (n) => {
       addNotification(n);
-      if (n.type !== 'cursor') toast(n.message, { icon: '🔔', duration: 3000 });
+      if (n.type !== "cursor") toast(n.message, { icon: "🔔", duration: 3000 });
     });
 
     socket.on(EVENTS.DOCUMENT_CREATED, ({ document }) => {
@@ -119,7 +184,11 @@ export function SocketProvider({ children }) {
       useFileStore.getState().addFile(file);
     });
 
-    return () => { socket.disconnect(); socketRef.current = null; setIsConnected(false); };
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
+    };
   }, [isAuthenticated, accessToken]);
 
   const joinRoom = (roomId, sessionId) => {
@@ -138,14 +207,22 @@ export function SocketProvider({ children }) {
     socketRef.current?.emit(EVENTS.CURSOR_MOVE, { roomId, x, y, tool });
   };
 
-  const emitTypingStart = (roomId) => socketRef.current?.emit(EVENTS.TYPING_START, { roomId });
-  const emitTypingStop = (roomId) => socketRef.current?.emit(EVENTS.TYPING_STOP, { roomId });
+  const emitTypingStart = (roomId) =>
+    socketRef.current?.emit(EVENTS.TYPING_START, { roomId });
+  const emitTypingStop = (roomId) =>
+    socketRef.current?.emit(EVENTS.TYPING_STOP, { roomId });
 
   const emitChatMessage = (roomId, content, type, replyTo) => {
-    socketRef.current?.emit(EVENTS.CHAT_MESSAGE, { roomId, content, type, replyTo });
+    socketRef.current?.emit(EVENTS.CHAT_MESSAGE, {
+      roomId,
+      content,
+      type,
+      replyTo,
+    });
   };
 
-  const emitChatSeen = (roomId) => socketRef.current?.emit(EVENTS.CHAT_SEEN, { roomId });
+  const emitChatSeen = (roomId) =>
+    socketRef.current?.emit(EVENTS.CHAT_SEEN, { roomId });
 
   const emitYjsSync = (roomId, type, data) => {
     socketRef.current?.emit(EVENTS.EDITOR_YJS_SYNC, { roomId, type, data });
@@ -160,14 +237,32 @@ export function SocketProvider({ children }) {
   };
 
   const emitLanguageChange = (roomId, language) => {
-    socketRef.current?.emit(EVENTS.EDITOR_LANGUAGE_CHANGE, { roomId, language });
+    socketRef.current?.emit(EVENTS.EDITOR_LANGUAGE_CHANGE, {
+      roomId,
+      language,
+    });
   };
 
-  const onYjsSync = (cb) => { socketRef.current?.on(EVENTS.EDITOR_YJS_SYNC, cb); return () => socketRef.current?.off(EVENTS.EDITOR_YJS_SYNC, cb); };
-  const onYjsUpdate = (cb) => { socketRef.current?.on(EVENTS.EDITOR_YJS_UPDATE, cb); return () => socketRef.current?.off(EVENTS.EDITOR_YJS_UPDATE, cb); };
-  const onYjsAwareness = (cb) => { socketRef.current?.on(EVENTS.EDITOR_YJS_AWARENESS, cb); return () => socketRef.current?.off(EVENTS.EDITOR_YJS_AWARENESS, cb); };
-  const onLanguageChange = (cb) => { socketRef.current?.on(EVENTS.EDITOR_LANGUAGE_CHANGE, cb); return () => socketRef.current?.off(EVENTS.EDITOR_LANGUAGE_CHANGE, cb); };
-  const onCursorMove = (cb) => { socketRef.current?.on(EVENTS.CURSOR_MOVE, cb); return () => socketRef.current?.off(EVENTS.CURSOR_MOVE, cb); };
+  const onYjsSync = (cb) => {
+    socketRef.current?.on(EVENTS.EDITOR_YJS_SYNC, cb);
+    return () => socketRef.current?.off(EVENTS.EDITOR_YJS_SYNC, cb);
+  };
+  const onYjsUpdate = (cb) => {
+    socketRef.current?.on(EVENTS.EDITOR_YJS_UPDATE, cb);
+    return () => socketRef.current?.off(EVENTS.EDITOR_YJS_UPDATE, cb);
+  };
+  const onYjsAwareness = (cb) => {
+    socketRef.current?.on(EVENTS.EDITOR_YJS_AWARENESS, cb);
+    return () => socketRef.current?.off(EVENTS.EDITOR_YJS_AWARENESS, cb);
+  };
+  const onLanguageChange = (cb) => {
+    socketRef.current?.on(EVENTS.EDITOR_LANGUAGE_CHANGE, cb);
+    return () => socketRef.current?.off(EVENTS.EDITOR_LANGUAGE_CHANGE, cb);
+  };
+  const onCursorMove = (cb) => {
+    socketRef.current?.on(EVENTS.CURSOR_MOVE, cb);
+    return () => socketRef.current?.off(EVENTS.CURSOR_MOVE, cb);
+  };
 
   // ── Preview Sync helpers ───────────────────────────────────────
   const emitPreviewSync = (roomId, html) => {
@@ -183,7 +278,12 @@ export function SocketProvider({ children }) {
     socketRef.current?.emit(EVENTS.CODE_RUN, { roomId, language });
   };
   const emitCodeOutput = (roomId, output, language, executionTime) => {
-    socketRef.current?.emit(EVENTS.CODE_OUTPUT, { roomId, output, language, executionTime });
+    socketRef.current?.emit(EVENTS.CODE_OUTPUT, {
+      roomId,
+      output,
+      language,
+      executionTime,
+    });
   };
   const onCodeRun = (cb) => {
     socketRef.current?.on(EVENTS.CODE_RUN, cb);
@@ -195,37 +295,60 @@ export function SocketProvider({ children }) {
   };
 
   return (
-    <SocketContext.Provider value={{
-      socket: socketRef.current,
-      isConnected,
-      joinRoom,
-      leaveRoom,
-      emitCursorMove,
-      emitTypingStart,
-      emitTypingStop,
-      emitWhiteboardEvent,
-      emitWhiteboardClear: () => socketRef.current?.emit(EVENTS.WHITEBOARD_CLEAR),
-      emitEditorSync: emitYjsSync,
-      emitEditorUpdate: emitYjsUpdate,
-      emitEditorAwareness: emitYjsAwareness,
-      emitLanguageChange,
-      emitMeetingJoin: (roomId) => socketRef.current?.emit('meeting:join', { roomId }),
-      emitMeetingLeave: (roomId) => socketRef.current?.emit('meeting:leave', { roomId }),
-      emitScreenShareStart: (roomId) => socketRef.current?.emit('screen_share:start', { roomId }),
-      emitScreenShareStop: (roomId) => socketRef.current?.emit('screen_share:stop', { roomId }),
-      emitUserActivityChange: (roomId, activity) => socketRef.current?.emit('user:activity_change', { roomId, activity }),
-      emitWebRTCSignal: (targetUserId, signal, isScreen = false) => socketRef.current?.emit('webrtc:signal', { targetUserId, signal, isScreen }),
-      emitChatMessage,
-      emitChatSeen,
-      emitPreviewSync,
-      emitCodeRun,
-      emitCodeOutput,
-      onYjsSync, onYjsUpdate, onYjsAwareness, onLanguageChange, onCursorMove,
-      onPreviewSync,
-      onCodeRun,
-      onCodeOutput,
-      EVENTS,
-    }}>
+    <SocketContext.Provider
+      value={{
+        socket: socketRef.current,
+        isConnected,
+        joinRoom,
+        leaveRoom,
+        emitCursorMove,
+        emitTypingStart,
+        emitTypingStop,
+        emitWhiteboardEvent,
+        emitWhiteboardClear: () =>
+          socketRef.current?.emit(EVENTS.WHITEBOARD_CLEAR),
+        emitEditorSync: emitYjsSync,
+        emitEditorUpdate: emitYjsUpdate,
+        emitEditorAwareness: emitYjsAwareness,
+        emitLanguageChange,
+        emitMeetingJoin: (roomId) =>
+          socketRef.current?.emit("meeting:join", { roomId }),
+        emitMeetingLeave: (roomId) =>
+          socketRef.current?.emit("meeting:leave", { roomId }),
+        emitScreenShareStart: (roomId) =>
+          socketRef.current?.emit("screen_share:start", { roomId }),
+        emitScreenShareStop: (roomId) =>
+          socketRef.current?.emit("screen_share:stop", { roomId }),
+        emitUserActivityChange: (roomId, activity) =>
+          socketRef.current?.emit("user:activity_change", { roomId, activity }),
+        emitMeetingMediaState: (roomId, audioEnabled, videoEnabled) =>
+          socketRef.current?.emit("meeting:media_state", {
+            roomId,
+            audioEnabled,
+            videoEnabled,
+          }),
+        emitWebRTCSignal: (targetUserId, signal, isScreen = false) =>
+          socketRef.current?.emit("webrtc:signal", {
+            targetUserId,
+            signal,
+            isScreen,
+          }),
+        emitChatMessage,
+        emitChatSeen,
+        emitPreviewSync,
+        emitCodeRun,
+        emitCodeOutput,
+        onYjsSync,
+        onYjsUpdate,
+        onYjsAwareness,
+        onLanguageChange,
+        onCursorMove,
+        onPreviewSync,
+        onCodeRun,
+        onCodeOutput,
+        EVENTS,
+      }}
+    >
       {children}
     </SocketContext.Provider>
   );
