@@ -57,6 +57,23 @@ export function SocketProvider({ children }) {
   const applyRemoteEvent = useWhiteboardStore((s) => s.applyRemoteEvent);
   const [isConnected, setIsConnected] = useState(false);
 
+  // Update socket auth when token changes
+  useEffect(() => {
+    if (!socketRef.current) return;
+    
+    if (accessToken) {
+      socketRef.current.auth = { token: accessToken };
+      // If socket is disconnected, reconnect with new token
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      } else {
+        // If already connected, disconnect and reconnect with new token
+        socketRef.current.disconnect();
+        socketRef.current.connect();
+      }
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     if (!isAuthenticated || !accessToken) return;
 
@@ -88,6 +105,7 @@ export function SocketProvider({ children }) {
         try {
           const { authService } = await import("../services/index.js");
           await authService.getMe();
+          // Token refresh will be handled by the useEffect above
         } catch (e) {
           useAuthStore.getState().logout();
         }
@@ -189,7 +207,7 @@ socket.on(
       socketRef.current = null;
       setIsConnected(false);
     };
-  }, [isAuthenticated, accessToken]);
+  }, [isAuthenticated]);
 
   const joinRoom = (roomId, sessionId) => {
     socketRef.current?.emit(EVENTS.ROOM_JOIN, { roomId, sessionId });
