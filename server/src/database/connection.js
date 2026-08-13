@@ -5,10 +5,10 @@ mongoose.set('bufferCommands', false);
 let isConnected = false;
 
 const connectDB = async () => {
-  if (isConnected) return;
+  if (isConnected) return;   // is connect 
 
   const options = {
-    serverSelectionTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 5000,  
     socketTimeoutMS: 45000,
     // Connection pool: keep 2–10 connections warm, never reconnect per-request
     minPoolSize: 2,
