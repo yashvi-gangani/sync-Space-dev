@@ -27,6 +27,7 @@ const EVENTS = {
   NOTIFICATION: 'notification',
   DOCUMENT_CREATED: 'document:created', FILE_CREATED: 'file:created',
   PREVIEW_SYNC: 'preview:sync',
+  VIEWPORT_SYNC: 'viewport:sync',
   CODE_RUN: 'code:run', CODE_OUTPUT: 'code:output',
 };
 
@@ -178,6 +179,15 @@ export function SocketProvider({ children }) {
     return () => socketRef.current?.off(EVENTS.PREVIEW_SYNC, cb);
   };
 
+  // ── Viewport Sync helpers ───────────────────────────────────────
+  const emitViewportSync = (roomId, viewState) => {
+    socketRef.current?.emit(EVENTS.VIEWPORT_SYNC, { roomId, viewState });
+  };
+  const onViewportSync = (cb) => {
+    socketRef.current?.on(EVENTS.VIEWPORT_SYNC, cb);
+    return () => socketRef.current?.off(EVENTS.VIEWPORT_SYNC, cb);
+  };
+
   // ── Code Execution Sync helpers ─────────────────────────────────
   const emitCodeRun = (roomId, language) => {
     socketRef.current?.emit(EVENTS.CODE_RUN, { roomId, language });
@@ -218,10 +228,12 @@ export function SocketProvider({ children }) {
       emitChatMessage,
       emitChatSeen,
       emitPreviewSync,
+      emitViewportSync,
       emitCodeRun,
       emitCodeOutput,
       onYjsSync, onYjsUpdate, onYjsAwareness, onLanguageChange, onCursorMove,
       onPreviewSync,
+      onViewportSync,
       onCodeRun,
       onCodeOutput,
       EVENTS,

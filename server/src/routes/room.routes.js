@@ -20,7 +20,18 @@ router.delete('/:id/members/:userId', roomController.kickMember);
 router.post('/:id/transfer', roomController.transferOwnership);
 router.post('/:id/sessions', roomController.createSession);
 router.patch('/:id/sessions/:sessionId/end', roomController.endSession);
-router.post('/:id/leave', roomController.leaveRoom);
 router.get('/:id/sessions', roomController.getRoomSessions);
+
+// Recording routes
+const recordingController = require('../controllers/recording.controller');
+const aiController = require('../controllers/ai.controller');
+const { upload } = require('../middlewares/upload');
+router.post('/:id/sessions/:sessionId/recording/start', recordingController.startRecording);
+router.post('/:id/sessions/:sessionId/recording/save', upload.single('recording'), recordingController.saveRecording);
+
+// AI routes
+router.post('/:id/sessions/:sessionId/summary', aiController.generateSummary);
+
+router.post('/:id/leave', roomController.leaveRoom);
 
 module.exports = router;

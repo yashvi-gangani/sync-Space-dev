@@ -41,7 +41,7 @@ class FeatureBoundary extends Component {
 export default function CollaboratePage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { currentRoom, currentSession, setCurrentRoom, setCurrentSession, setMembers, members } = useRoomStore();
+  const { currentRoom, currentSession, setCurrentRoom, setCurrentSession, setMembers, members, isLeading, setIsLeading, isFollowing, setIsFollowing } = useRoomStore();
   const { chatOpen, setChatOpen } = useUIStore();
   const { socket, joinRoom, leaveRoom, isConnected, emitMeetingJoin, emitMeetingLeave, emitScreenShareStart, emitScreenShareStop } = useSocket();
   const { isInMeeting, isScreenSharing, setMeetingState, clearMeeting, meetingParticipants } = useMeetingStore();
@@ -324,8 +324,26 @@ export default function CollaboratePage() {
           </span>
         </div>
 
-        {/* Layout toggles */}
+        {/* Presentation Toggles */}
         <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-0.5 border border-surface-700 ml-auto md:ml-2">
+          <button
+            onClick={() => setIsLeading(!isLeading)}
+            title="Lead the session (others will follow your view)"
+            className={`px-2 py-1 rounded text-[10px] uppercase font-bold transition-colors tracking-wider ${isLeading ? 'bg-indigo-600 text-white shadow-md' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
+          >
+            {isLeading ? 'Stop Leading' : 'Lead'}
+          </button>
+          <button
+            onClick={() => setIsFollowing(!isFollowing)}
+            title="Follow the session leader"
+            className={`px-2 py-1 rounded text-[10px] uppercase font-bold transition-colors tracking-wider ${isFollowing ? 'bg-pink-600 text-white shadow-md' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}
+          >
+            {isFollowing ? 'Stop Follow' : 'Follow'}
+          </button>
+        </div>
+
+        {/* Layout toggles */}
+        <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-0.5 border border-surface-700 ml-1">
           <button
             onClick={() => setLayout('whiteboard')}
             title="Whiteboard only"

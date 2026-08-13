@@ -61,6 +61,9 @@ const SOCKET_EVENTS = {
   // Live Preview Sync
   PREVIEW_SYNC: 'preview:sync',
 
+  // Viewport Sync
+  VIEWPORT_SYNC: 'viewport:sync',
+
   // Code Execution Sync
   CODE_RUN: 'code:run',
   CODE_OUTPUT: 'code:output',

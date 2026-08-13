@@ -7,6 +7,11 @@ export const useRoomStore = create((set) => ({
   members: [],
   isInRoom: false,
   currentSession: null,
+  isLeading: false,
+  isFollowing: false,
+
+  setIsLeading: (val) => set({ isLeading: val, isFollowing: false }),
+  setIsFollowing: (val) => set({ isFollowing: val, isLeading: false }),
 
   setCurrentRoom: (room) => set({ currentRoom: room, isInRoom: !!room }),
   setRooms: (rooms) => set({ rooms }),
@@ -35,5 +40,5 @@ export const useRoomStore = create((set) => ({
     members: state.members.map((m) => (m.id === userId ? { ...m, ...updates } : m)),
   })),
 
-  leaveRoom: () => set({ currentRoom: null, members: [], isInRoom: false, currentSession: null }),
+  leaveRoom: () => set({ currentRoom: null, members: [], isInRoom: false, currentSession: null, isLeading: false, isFollowing: false }),
 }));

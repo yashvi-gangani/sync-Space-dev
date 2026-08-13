@@ -52,6 +52,13 @@ export default function MeetingManager() {
 
   const peersRef = useRef({});
   const screenPeersRef = useRef({});
+  const lastLocalStreamRef = useRef(null);
+  const lastScreenStreamRef = useRef(null);
+
+  useEffect(() => {
+    if (localStream) lastLocalStreamRef.current = localStream;
+    if (localScreenStream) lastScreenStreamRef.current = localScreenStream;
+  }, [localStream, localScreenStream]);
 
   useEffect(() => {
     if (!socket || !currentRoom) return;
@@ -153,14 +160,16 @@ export default function MeetingManager() {
       Object.values(screenPeersRef.current).forEach(peer => peer.destroy());
       screenPeersRef.current = {};
       
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+      if (lastLocalStreamRef.current) {
+        lastLocalStreamRef.current.getTracks().forEach(track => track.stop());
+        lastLocalStreamRef.current = null;
       }
-      if (localScreenStream) {
-        localScreenStream.getTracks().forEach(track => track.stop());
+      if (lastScreenStreamRef.current) {
+        lastScreenStreamRef.current.getTracks().forEach(track => track.stop());
+        lastScreenStreamRef.current = null;
       }
     }
-  }, [isInMeeting, localStream, localScreenStream]);
+  }, [isInMeeting]);
 
   return null;
 }

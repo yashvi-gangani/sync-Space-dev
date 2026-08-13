@@ -124,7 +124,7 @@ function initializeSocket(server) {
         const members = Array.from(roomData.connectedUsers.values());
         
         // Fetch recent chat history
-        const recentMessages = await chatService.getMessages(roomId, socket.user.id, { limit: 50 });
+        const recentMessages = await chatService.getMessages(roomId, sessionId, socket.user.id, { limit: 50 });
 
         socket.emit(EVENTS.ROOM_JOINED, {
           room: { _id: room._id, name: room.name, slug: room.slug, type: room.type, activeMode: room.activeMode, settings: room.settings },
@@ -300,7 +300,8 @@ function initializeSocket(server) {
     socket.on(EVENTS.CHAT_MESSAGE, async ({ roomId, content, type, replyTo }) => {
       try {
         const room = socket.currentRoom || roomId;
-        const message = await chatService.createMessage(room, socket.user.id, { content, type, replyTo });
+        const sessionId = socket.currentSession;
+        const message = await chatService.createMessage(room, sessionId, socket.user.id, { content, type, replyTo });
         io.to(room).emit(EVENTS.CHAT_MESSAGE, { message });
       } catch (err) {
         socket.emit(EVENTS.ERROR, { message: err.message });
@@ -388,6 +389,16 @@ function initializeSocket(server) {
         triggeredBy: triggeredBy || socket.user.id,
         userName: socket.user.name,
         timestamp: Date.now(),
+      });
+    });
+
+    // ── Viewport Sync ─────────────────────────────────────────────
+    socket.on(EVENTS.VIEWPORT_SYNC, ({ roomId, viewState }) => {
+      const room = roomId || socket.currentRoom;
+      if (!room) return;
+      socket.to(room).emit(EVENTS.VIEWPORT_SYNC, {
+        viewState,
+        userId: socket.user.id,
       });
     });
 

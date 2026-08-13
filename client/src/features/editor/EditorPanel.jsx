@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { MonacoBinding } from 'y-monaco';
 import { Awareness } from 'y-protocols/awareness';
 import * as awarenessProtocol from 'y-protocols/awareness';
+import { executionService } from '../../services';
 
 const LANGUAGES = [
   { value: 'javascript', label: 'JavaScript' },
@@ -51,24 +52,8 @@ const TEMPLATES = {
 };
 
 /**
- * Wandbox API language map
- * Calling Wandbox directly from the browser avoids backend network issues on Render free tier.
- * Wandbox supports CORS from any origin without authentication.
+ * We use the backend execution service (Piston) for code execution.
  */
-const WANDBOX_COMPILER_MAP = {
-  javascript: 'nodejs-18.20.4',
-  typescript: 'typescript-5.6.2',
-  python:     'cpython-3.14.0',
-  java:       'openjdk-jdk-21+35',
-  c:          'gcc-head-c',
-  cpp:        'gcc-head',
-
-  go:         'go-1.14.15',
-  rust:       'rust-1.64.0',
-  php:        'php-5.6.40',
-};
-
-const WANDBOX_API = 'https://wandbox.org/api/compile.json';
 
 
 /**
@@ -134,7 +119,7 @@ ${code}
 }
 
 export default function EditorPanel() {
-  const { currentRoom, currentSession } = useRoomStore();
+  const { currentRoom, currentSession, isLeading, isFollowing } = useRoomStore();
   const {
     language, setLanguage,
     theme: editorTheme, setTheme: setEditorTheme,
@@ -146,6 +131,7 @@ export default function EditorPanel() {
     onLanguageChange, isConnected, emitTypingStart, emitTypingStop,
     emitPreviewSync, onPreviewSync,
     emitCodeRun, emitCodeOutput, onCodeRun, onCodeOutput,
+    emitViewportSync, onViewportSync,
   } = useSocket();
 
   const [editorValue, setEditorValue] = useState('// Start coding here...\n');
@@ -206,6 +192,31 @@ export default function EditorPanel() {
     });
     return cleanup;
   }, [onPreviewSync]);
+
+  // ── Viewport Sync (Follow Presenter) ───────────────────────────────────
+  useEffect(() => {
+    if (!isLeading || !editorRef.current || !emitViewportSync) return;
+    const editor = editorRef.current;
+    let timer;
+    const disposable = editor.onDidScrollChange((e) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        emitViewportSync(currentRoom?._id, { type: 'editor', scrollTop: e.scrollTop, scrollLeft: e.scrollLeft });
+      }, 500);
+    });
+    return () => { clearTimeout(timer); disposable.dispose(); };
+  }, [isLeading, currentRoom?._id, emitViewportSync, editorReady]);
+
+  useEffect(() => {
+    if (!isFollowing || !onViewportSync || !editorRef.current) return;
+    const cleanup = onViewportSync(({ viewState }) => {
+      if (viewState?.type === 'editor' && editorRef.current) {
+        if (viewState.scrollTop !== undefined) editorRef.current.setScrollTop(viewState.scrollTop);
+        if (viewState.scrollLeft !== undefined) editorRef.current.setScrollLeft(viewState.scrollLeft);
+      }
+    });
+    return cleanup;
+  }, [isFollowing, onViewportSync, editorReady]);
 
   // ── Receive remote code execution sync ─────────────────────────────────
   useEffect(() => {
@@ -315,7 +326,7 @@ export default function EditorPanel() {
 
   // ── Monaco Binding per Language ────────────────────────────────────────
   useEffect(() => {
-    if (!ydocRef.current || !editorRef.current || !awarenessRef.current) return;
+    if (!ydocRef.current || !editorRef.current || !awarenessRef.current || !editorReady) return;
     
     // 1. Clean up old binding so we don't sync changes to the old language
     if (bindingRef.current) {
@@ -326,25 +337,13 @@ export default function EditorPanel() {
     // 2. Get the Yjs text for the newly selected language
     const ytext = ydocRef.current.getText(`codestate_${language}`);
     
-    // 3. Initialize code if empty
+    // 3. Force the editor to display the code for this language BEFORE binding
+    // Use setValue so that the model actually resets immediately without relying on the old binding.
     let existingCode = ytext.toString();
-    
-    if (existingCode === '') {
-      const defaultTemplate = TEMPLATES[language] || '';
-      if (defaultTemplate) {
-        ydocRef.current.transact(() => { ytext.insert(0, defaultTemplate); }, 'local');
-        existingCode = defaultTemplate;
-      }
-    }
-    
-    // 4. Force the editor to display the code for this language BEFORE binding
-    // This prevents MonacoBinding from copying the previous language's code into the new ytext
-    if (editorRef.current.getValue() !== existingCode) {
-      editorRef.current.setValue(existingCode);
-      setEditorValue(existingCode);
-    }
+    editorRef.current.setValue(existingCode);
+    setEditorValue(existingCode);
 
-    // 5. Create new binding
+    // 4. Create new binding
     bindingRef.current = new MonacoBinding(
       ytext,
       editorRef.current.getModel(),
@@ -386,6 +385,16 @@ export default function EditorPanel() {
     const lang = e.target.value;
     setLanguage(lang);
     emitLanguageChange(currentRoom._id, lang);
+
+    if (ydocRef.current) {
+      const newYText = ydocRef.current.getText(`codestate_${lang}`);
+      if (newYText.toString() === '') {
+        const defaultTemplate = TEMPLATES[lang] || '';
+        if (defaultTemplate) {
+          ydocRef.current.transact(() => { newYText.insert(0, defaultTemplate); }, 'local');
+        }
+      }
+    }
   };
 
   // ── Copy ────────────────────────────────────────────────────────────────
@@ -418,18 +427,10 @@ export default function EditorPanel() {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  // ── Code Runner — calls Piston API directly from browser ────────────────
-  // Piston (emkc.org) is a public API with CORS enabled, so we call it directly
-  // from the browser. This bypasses the backend and eliminates Render network failures.
+  // ── Code Runner — calls our backend execution API ────────────────
   const handleRunCode = useCallback(async () => {
     if (['html', 'css', 'markdown', 'json'].includes(language)) {
       toast.error(`Code execution is not supported for ${language}.`);
-      return;
-    }
-
-    const wandboxCompiler = WANDBOX_COMPILER_MAP[language];
-    if (!wandboxCompiler) {
-      toast.error(`No execution runtime configured for ${language}.`);
       return;
     }
 
@@ -449,41 +450,27 @@ export default function EditorPanel() {
 
     const startTime = Date.now();
     try {
-      const res = await fetch(WANDBOX_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          compiler: wandboxCompiler,
-          code: code,
-          save: false
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Wandbox API error: ${res.status} ${res.statusText}`);
-      }
-
-      const data = await res.json();
+      const res = await executionService.executeCode(language, code);
+      const data = res.data;
+      
       const executionTime = Date.now() - startTime;
       const newOutput = [];
 
-      // Compile phase (if there's compiler output or error)
-      if (data.compiler_message || data.compiler_error) {
-        if (data.status !== '0' && !data.program_output) {
-          newOutput.push('[COMPILE ERROR]');
-        } else {
-          newOutput.push('[COMPILE OUTPUT]');
-        }
-        newOutput.push(...(data.compiler_message || data.compiler_error).split('\n').filter(Boolean));
+      // Compile phase
+      if (data.compile && data.compile.output) {
+        newOutput.push('[COMPILE OUTPUT]');
+        newOutput.push(...data.compile.output.split('\n').filter(Boolean));
       }
 
-      // Run phase
-      if (data.program_output || data.program_message) {
-        newOutput.push(...(data.program_output || data.program_message).split('\n'));
-      }
-      if (data.program_error) {
+      // Run phase errors
+      if (data.run && data.run.stderr) {
         newOutput.push('[RUNTIME ERROR]');
-        newOutput.push(...data.program_error.split('\n').filter(Boolean));
+        newOutput.push(...data.run.stderr.split('\n').filter(Boolean));
+      }
+
+      // Run phase output
+      if (data.run && data.run.stdout) {
+        newOutput.push(...data.run.stdout.split('\n').filter(Boolean));
       }
 
       if (newOutput.length === 0) {
@@ -497,7 +484,8 @@ export default function EditorPanel() {
       }
     } catch (err) {
       console.error('Execution error:', err);
-      const errOutput = ['\u274c Execution Failed: ' + err.message];
+      const errorMessage = err.response?.data?.message || err.message;
+      const errOutput = ['\u274c Execution Failed: ' + errorMessage];
       setOutput(errOutput);
       if (currentRoom?._id && isConnected) {
         emitCodeOutput(currentRoom._id, errOutput, language, Date.now() - startTime);
@@ -511,7 +499,7 @@ export default function EditorPanel() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   const isHtml = language === 'html';
-  const isExecutable = Object.keys(WANDBOX_COMPILER_MAP).includes(language);
+  const isExecutable = !['html', 'css', 'markdown', 'json'].includes(language);
 
 
   return (
@@ -598,7 +586,7 @@ export default function EditorPanel() {
                 // Ctrl+Enter shortcut
                 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
                   const currentLang = useEditorStore.getState().language;
-                  if (Object.keys(WANDBOX_COMPILER_MAP).includes(currentLang)) {
+                  if (!['html', 'css', 'markdown', 'json'].includes(currentLang)) {
                     runCodeRef.current?.();
                   } else if (currentLang === 'html') {
                     handleRunHtml();

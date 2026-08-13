@@ -11,6 +11,10 @@ const sessionSchema = new mongoose.Schema({
   editorSnapshot: { type: String, default: '' },
   editorLanguage: { type: String, default: 'javascript' },
   eventCount: { type: Number, default: 0 },
+  recordingUrl: { type: String, default: null },
+  recordingStatus: { type: String, enum: ['none', 'recording', 'completed', 'failed'], default: 'none' },
+  recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  aiSummary: { type: String, default: null }
 }, { timestamps: true });
 
 sessionSchema.index({ room: 1, startedAt: -1 });

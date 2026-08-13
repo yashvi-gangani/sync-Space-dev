@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const chatMessageSchema = new mongoose.Schema({
   room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
+  session: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', default: null },
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String, required: true, maxlength: 2000 },
   type: { type: String, enum: ['text', 'emoji', 'system'], default: 'text' },

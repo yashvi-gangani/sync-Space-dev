@@ -5,9 +5,10 @@ import { useRoomStore } from '../store/roomStore';
 import { useAuthStore } from '../store/authStore';
 import InviteMemberModal from '../components/room/InviteMemberModal';
 import RoomSettingsModal from '../components/room/RoomSettingsModal';
+import AiSummaryModal from '../components/room/AiSummaryModal';
 import DocumentList from '../features/documents/DocumentList';
 import FileList from '../features/files/FileList';
-import { TbBrush, TbCode, TbUserPlus, TbSettings, TbHistory, TbUsers, TbTrash, TbCrown, TbLayoutColumns, TbLink, TbCopy, TbFileText, TbFolder } from 'react-icons/tb';
+import { TbBrush, TbCode, TbUserPlus, TbSettings, TbHistory, TbUsers, TbTrash, TbCrown, TbLayoutColumns, TbLink, TbCopy, TbFileText, TbFolder, TbVideo, TbBrain } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
 export default function RoomPage() {
@@ -22,6 +23,8 @@ export default function RoomPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [copying, setCopying] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // overview, documents, files
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [selectedSessionForSummary, setSelectedSessionForSummary] = useState(null);
 
   const handleCopyInviteLink = () => {
     const link = `${window.location.origin}/room/${slug}/collaborate`;
@@ -251,23 +254,54 @@ export default function RoomPage() {
               <p className="text-sm text-surface-500 text-center py-12">No replay sessions found. Start a whiteboard or editor session to log activities.</p>
             ) : (
               sessions.map((session) => (
-                <div key={session._id} className="py-4 flex items-center justify-between first:pt-0 last:pb-0">
+                <div key={session._id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-0 last:pb-0">
                   <div>
                     <p className="text-sm font-medium text-white">
-                      Session Started by {session.startedBy.name}
+                      Session Started by {session.startedBy?.name || 'Unknown'}
                     </p>
                     <p className="text-xs text-surface-450 mt-0.5">
                       Date: {new Date(session.startedAt).toLocaleDateString()} at {new Date(session.startedAt).toLocaleTimeString()}
                     </p>
-                    <p className="text-xs text-surface-500 mt-1">
-                      Duration: {session.duration ? `${Math.floor(session.duration / 60)}m ${session.duration % 60}s` : 'Ongoing / Live'}
-                    </p>
+                    <div className="flex flex-wrap gap-2 items-center mt-2">
+                      <span className="text-xs text-surface-400 bg-surface-800 px-2 py-0.5 rounded-full border border-surface-700">
+                        {session.duration ? `${Math.floor(session.duration / 60)}m ${session.duration % 60}s` : 'Live'}
+                      </span>
+                      {session.recordingStatus === 'completed' && session.recordingUrl && (
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
+                          Recorded
+                        </span>
+                      )}
+                      {session.recordingStatus === 'recording' && (
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20 animate-pulse">
+                          Recording
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {session.endedAt && (
-                    <Link to={`/room/${slug}/replay/${session._id}`} className="btn-secondary btn-sm">
-                      <span>View Replay</span>
-                    </Link>
-                  )}
+                  
+                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    {session.recordingStatus === 'completed' && session.recordingUrl && (
+                      <a href={session.recordingUrl} target="_blank" rel="noreferrer" className="btn-primary btn-sm flex items-center gap-1">
+                        <TbVideo size={16} /> Watch Video
+                      </a>
+                    )}
+                    {session.endedAt && (
+                      <button
+                        onClick={() => {
+                          setSelectedSessionForSummary(session);
+                          setSummaryModalOpen(true);
+                        }}
+                        className="btn-secondary btn-sm flex items-center gap-1"
+                      >
+                        <TbBrain size={16} /> AI Summary
+                      </button>
+                    )}
+                    {session.endedAt && (
+                      <Link to={`/room/${slug}/replay/${session._id}`} className="btn-secondary btn-sm flex items-center gap-1">
+                        <TbHistory size={16} /> View Replay
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -298,6 +332,7 @@ export default function RoomPage() {
 
       <InviteMemberModal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} roomId={currentRoom._id} />
       <RoomSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} room={currentRoom} />
+      <AiSummaryModal isOpen={summaryModalOpen} onClose={() => setSummaryModalOpen(false)} room={currentRoom} session={selectedSessionForSummary} />
     </div>
   );
 }

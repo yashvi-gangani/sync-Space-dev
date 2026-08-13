@@ -17,8 +17,8 @@ const COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec
 function genId() { return Math.random().toString(36).slice(2, 9); }
 
 export default function WhiteboardPanel({ height = 600 }) {
-  const { currentRoom } = useRoomStore();
-  const { emitWhiteboardEvent, onCursorMove, emitCursorMove } = useSocket();
+  const { currentRoom, isLeading, isFollowing } = useRoomStore();
+  const { emitWhiteboardEvent, onCursorMove, emitCursorMove, emitViewportSync, onViewportSync } = useSocket();
 
   const {
     tool, setTool, color, setColor, strokeWidth, setStrokeWidth,
@@ -74,6 +74,26 @@ export default function WhiteboardPanel({ height = 600 }) {
     return clean;
   }, [onCursorMove]);
 
+  // Viewport Sync (Follow Presenter)
+  useEffect(() => {
+    if (!isLeading) return;
+    const interval = setInterval(() => {
+      emitViewportSync?.(currentRoom?._id, { type: 'whiteboard', pan, zoom });
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isLeading, currentRoom?._id, pan, zoom, emitViewportSync]);
+
+  useEffect(() => {
+    if (!isFollowing || !onViewportSync) return;
+    const clean = onViewportSync(({ viewState }) => {
+      if (viewState?.type === 'whiteboard') {
+        if (viewState.pan) setPan(viewState.pan);
+        if (viewState.zoom) setZoom(viewState.zoom);
+      }
+    });
+    return clean;
+  }, [isFollowing, onViewportSync]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
@@ -113,6 +133,26 @@ export default function WhiteboardPanel({ height = 600 }) {
     if (!point) return;
 
     if (e.target === stage) setSelectedIds([]);
+    
+    // If there's an active text input, submit it on clicking elsewhere and stop further processing
+    if (textInput) {
+      if (textInput.value.trim()) {
+        const shape = {
+          id: genId(),
+          type: textInput.isSticky ? 'sticky' : 'text',
+          x: textInput.sceneX, y: textInput.sceneY,
+          text: textInput.value,
+          fill: textInput.isSticky ? '#fef08a' : color,
+          stroke: textInput.isSticky ? '#eab308' : undefined,
+          fontSize: 18, fontFamily: 'Inter, sans-serif'
+        };
+        addShape(shape);
+        emitWhiteboardEvent(currentRoom?._id, { type: 'add', shape });
+      }
+      setTextInput(null);
+      return;
+    }
+
     if (tool === 'select' || tool === 'hand') return; // hand tool uses stage dragging, not shape drawing
 
     setIsDrawing(true);
@@ -519,7 +559,9 @@ export default function WhiteboardPanel({ height = 600 }) {
               type="text"
               value={textInput.value}
               onChange={(e) => setTextInput((p) => ({ ...p, value: e.target.value }))}
-              onBlur={handleTextSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setTextInput(null);
+              }}
               className="bg-transparent border-b-2 border-primary-500 outline-none text-white text-lg px-1 min-w-[120px]"
               style={{ color, fontFamily: 'Inter, sans-serif', fontSize: 18 }}
               placeholder="Type here..."

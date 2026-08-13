@@ -235,6 +235,7 @@ class RoomService {
 
     const session = await Session.create({ room: roomId, startedBy: userId, participants: [userId] });
     await Room.findByIdAndUpdate(roomId, { lastActivity: new Date() });
+    await ActivityLog.create({ user: userId, room: roomId, action: 'session_started' });
     return session;
   }
 
@@ -244,6 +245,7 @@ class RoomService {
     session.endedAt = new Date();
     session.duration = Math.floor((session.endedAt - session.startedAt) / 1000);
     await session.save();
+    await ActivityLog.create({ user: userId, room: session.room, action: 'session_ended' });
     return session;
   }
 
