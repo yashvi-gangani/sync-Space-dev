@@ -37,15 +37,10 @@ exports.executeCode = async (req, res, next) => {
       });
     }
 
-    // Call Piston API
-    const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
+    // Call Piston API v1
+    const response = await axios.post('https://emkc.org/api/v1/piston/execute', {
       language: pistonLang,
-      version: '*',
-      files: [
-        {
-          content: code
-        }
-      ]
+      source: code
     });
 
     const data = response.data;
@@ -53,11 +48,11 @@ exports.executeCode = async (req, res, next) => {
     res.status(200).json({
       success: true,
       compile: {
-        output: data.compile?.output || ''
+        output: '' // v1 puts all errors in stderr
       },
       run: {
-        stdout: data.run?.stdout || '',
-        stderr: data.run?.stderr || ''
+        stdout: data.stdout || '',
+        stderr: data.stderr || ''
       },
       data: data
     });
