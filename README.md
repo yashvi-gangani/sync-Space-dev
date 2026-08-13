@@ -22,6 +22,7 @@ The project was inspired by tools like VS Code Live Share, Replit, and Excalidra
 - File and PDF sharing using Cloudinary
 - Room chat with user presence
 - Action replay for editor and whiteboard events
+- replay history
 
 
 # Architecture
