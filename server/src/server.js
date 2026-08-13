@@ -12,7 +12,7 @@ app.set('io', io);
 
 const start = async () => {
   await connectDB();
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ SyncSpace server running on port ${PORT} [${process.env.NODE_ENV}]`);
 
     // Keep-alive ping: prevents Render free-tier from spinning down (cold start = 3-5 min delay)
