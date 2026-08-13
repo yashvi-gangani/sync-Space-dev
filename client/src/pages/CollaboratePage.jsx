@@ -51,6 +51,14 @@ export default function CollaboratePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [layout, setLayout] = useState('both'); // 'both' | 'whiteboard' | 'editor'
+
+  useEffect(() => {
+    const layoutParam = searchParams.get('layout');
+    if (layoutParam && ['both', 'whiteboard', 'editor'].includes(layoutParam)) {
+      setLayout(layoutParam);
+    }
+  }, [searchParams]);
+
   const [dividerX, setDividerX] = useState(50); // percent
   const [dragging, setDragging] = useState(false);
   const [activities, setActivities] = useState({}); // { userId: 'activity_string' }
