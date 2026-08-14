@@ -4,7 +4,7 @@ import * as Y from 'yjs';
 import { useSocket } from '../../context/SocketContext';
 import { useRoomStore } from '../../store/roomStore';
 import { useEditorStore } from '../../store/editorStore';
-import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay, TbRefresh, TbExternalLink } from 'react-icons/tb';
+import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay, TbRefresh, TbExternalLink, TbTerminal, TbSparkles, TbX, TbBug, TbShieldCheck, TbGauge, TbLetterCase, TbMessage2 } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 import { MonacoBinding } from 'y-monaco';
 import { Awareness } from 'y-protocols/awareness';
@@ -135,6 +135,9 @@ export default function EditorPanel() {
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState([]);
   const [showConsole, setShowConsole] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [review, setReview] = useState(null);
+  const [showReview, setShowReview] = useState(false);
 
   // HTML Preview state
   const [previewHtml, setPreviewHtml] = useState('');
@@ -361,6 +364,45 @@ export default function EditorPanel() {
     URL.revokeObjectURL(a.href);
   };
 
+  // ── Terminal Shell Command Handler ──────────────────────────────────────
+  const [terminalInput, setTerminalInput] = useState('');
+
+  const handleTerminalSubmit = (e) => {
+    if (e.key === 'Enter') {
+      const cmd = terminalInput.trim();
+      if (!cmd) return;
+
+      let newOutput = [...output];
+      newOutput.push(`guest@syncspace:~$ ${cmd}`);
+
+      if (cmd === 'clear') {
+        setOutput([]);
+        setTerminalInput('');
+        return;
+      }
+
+      if (cmd === 'help') {
+        newOutput.push('Available Shell Commands:');
+        newOutput.push('  run    - Execute the code currently in the editor');
+        newOutput.push('  clear  - Clear the console terminal screen');
+        newOutput.push('  system - Display system connection and mode variables');
+        newOutput.push('  help   - Display this shell command manual');
+      } else if (cmd === 'run') {
+        handleRunCode();
+      } else if (cmd === 'system') {
+        newOutput.push(`SyncSpace Development Server v1.0.0`);
+        newOutput.push(`Connection: ${isConnected ? 'CONNECTED' : 'DISCONNECTED'}`);
+        newOutput.push(`Language Config: ${language}`);
+        newOutput.push(`Theme Style: ${editorTheme}`);
+      } else {
+        newOutput.push(`bash: ${cmd}: command not found`);
+      }
+
+      setOutput(newOutput);
+      setTerminalInput('');
+    }
+  };
+
   // ── Open preview in new tab ─────────────────────────────────────────────
   const handleOpenPreviewTab = () => {
     const html = previewHtml || buildPreviewDocument(editorRef.current?.getValue() || '');
@@ -395,7 +437,7 @@ export default function EditorPanel() {
     const startTime = Date.now();
     try {
       // Call our backend execution API
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1');
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5000/api/v1');
       const response = await fetch(`${API_URL}/execute`, {
         method: 'POST',
         headers: {
@@ -449,6 +491,35 @@ export default function EditorPanel() {
 
   useEffect(() => { runCodeRef.current = handleRunCode; }, [handleRunCode]);
 
+  // ── AI Code Reviewer ─────────────────────────────────────────────────────
+  const handleReviewCode = useCallback(async () => {
+    const val = editorRef.current ? editorRef.current.getValue() : '';
+    if (!val.trim()) {
+      toast.error('Editor is empty, nothing to review.');
+      return;
+    }
+
+    setIsReviewing(true);
+    setReview(null);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5000/api/v1');
+      const response = await fetch(`${API_URL}/execute/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language, code: val }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate AI code review.');
+      const data = await response.json();
+      setReview(data.review);
+      setShowReview(true);
+    } catch (err) {
+      toast.error(err.message || 'Failed to generate AI code review.');
+    } finally {
+      setIsReviewing(false);
+    }
+  }, [language]);
+
   // ── Render ─────────────────────────────────────────────────────────────
   const isHtml = language === 'html';
   const isExecutable = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(language);
@@ -457,7 +528,7 @@ export default function EditorPanel() {
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
 
       {/* ── Toolbar ───────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 h-12 bg-surface-900 border-b border-surface-800 px-3 flex items-center gap-2">
+      <div className="flex-shrink-0 min-h-[3rem] h-auto py-2 bg-surface-900 border-b border-surface-800 px-3 flex flex-wrap items-center gap-2">
         {/* Language */}
         <select
           value={language}
@@ -498,9 +569,19 @@ export default function EditorPanel() {
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* AI Review button */}
+        <button
+          onClick={handleReviewCode}
+          disabled={isReviewing}
+          className="flex items-center gap-1.5 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
+        >
+          <TbSparkles size={13} />
+          <span>{isReviewing ? 'Reviewing...' : 'Review Code'}</span>
+        </button>
+
+        <div className="ml-auto flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-end mt-2 sm:mt-0">
           {/* Save indicator */}
-          <span className={`text-xs transition-colors ${saveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'}`}>
+          <span className={`text-xs transition-colors mr-2 ${saveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'}`}>
             {saveStatus === 'saving' ? '● Saving…' : '✓ Saved'}
           </span>
 
@@ -512,6 +593,9 @@ export default function EditorPanel() {
           </button>
           <button onClick={handleDownload} title="Download file" className="p-1.5 text-surface-400 hover:text-white hover:bg-surface-700 rounded transition-colors">
             <TbDownload size={15} />
+          </button>
+          <button onClick={() => setShowConsole(!showConsole)} title="Toggle Console Terminal" className={`p-1.5 rounded transition-colors ${showConsole ? 'text-green-400 bg-surface-700' : 'text-surface-400 hover:text-white hover:bg-surface-700'}`}>
+            <TbTerminal size={15} />
           </button>
         </div>
       </div>
@@ -566,8 +650,8 @@ export default function EditorPanel() {
           {/* Console output (JS runner) */}
           {showConsole && (
             <div className="h-44 border-t border-slate-800 bg-[#070b13] flex flex-col flex-shrink-0 text-white font-mono text-[11px]">
-              <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Output</span>
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800 flex-shrink-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Terminal</span>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setOutput([])} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 hover:text-white rounded text-[10px] text-slate-450 transition-colors">Clear</button>
                   <button onClick={() => setShowConsole(false)} className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900/30 hover:text-red-300 rounded text-[10px] text-red-400 transition-colors">Close</button>
@@ -575,7 +659,7 @@ export default function EditorPanel() {
               </div>
               <div className="flex-1 p-3 overflow-y-auto space-y-1 select-text selection:bg-indigo-500/30">
                 {output.length === 0 ? (
-                  <div className="text-slate-500 italic">No output. Click "Run" to execute the code.</div>
+                  <div className="text-slate-500 italic">No output. Click "Run" or type 'run' below.</div>
                 ) : (
                   output.map((line, idx) => {
                     let cls = 'text-slate-300';
@@ -584,15 +668,72 @@ export default function EditorPanel() {
                     else if (line.startsWith('[INFO]')) cls = 'text-blue-400';
                     else if (line.startsWith('=>')) cls = 'text-green-400 font-semibold';
                     else if (line.startsWith('Runtime Error:')) cls = 'text-red-500 font-semibold border-l-2 border-red-500 pl-2 py-0.5 bg-red-950/10';
+                    else if (line.startsWith('guest@syncspace:~$')) cls = 'text-blue-400 font-bold';
                     return (
                       <div key={idx} className={`${cls} whitespace-pre-wrap leading-relaxed`}>{line}</div>
                     );
                   })
                 )}
               </div>
+              {/* Interactive terminal command input */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-slate-900 bg-[#04060b] flex-shrink-0 text-slate-300">
+                <span className="text-green-400 font-semibold flex-shrink-0 select-none">guest@syncspace:~$</span>
+                <input
+                  type="text"
+                  value={terminalInput}
+                  onChange={(e) => setTerminalInput(e.target.value)}
+                  onKeyDown={handleTerminalSubmit}
+                  className="flex-1 bg-transparent border-none outline-none text-white font-mono text-[11px] p-0 focus:ring-0"
+                  placeholder="Type 'help' or command..."
+                />
+              </div>
             </div>
           )}
         </div>
+
+        {/* AI Code Review side panel */}
+        {showReview && review && (
+          <div className="w-full md:w-96 flex-shrink-0 h-full bg-surface-925 border-l border-surface-800 flex flex-col">
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-surface-800">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <TbSparkles size={16} className="text-purple-400" /> AI Code Review
+              </div>
+              <button onClick={() => setShowReview(false)} className="p-1 text-surface-400 hover:text-white hover:bg-surface-800 rounded">
+                <TbX size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <p className="text-xs text-surface-300">{review.summary}</p>
+              <p className="text-[10px] text-surface-500">
+                Generated by {review.generatedBy === 'openai' ? 'OpenAI' : 'local heuristic check'}
+              </p>
+
+              {(review.suggestions || []).length === 0 ? (
+                <p className="text-xs text-surface-500 italic mt-4">No suggestions, code looks clean.</p>
+              ) : (
+                (review.suggestions || []).map((s, idx) => {
+                  const icons = {
+                    bug: <TbBug size={14} className="text-red-400" />,
+                    security: <TbShieldCheck size={14} className="text-yellow-400" />,
+                    performance: <TbGauge size={14} className="text-blue-400" />,
+                    naming: <TbLetterCase size={14} className="text-purple-400" />,
+                    missing_comment: <TbMessage2 size={14} className="text-green-400" />,
+                  };
+                  return (
+                    <div key={idx} className="bg-surface-900 border border-surface-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-white">
+                        {icons[s.category] || <TbSparkles size={14} className="text-surface-400" />}
+                        <span>Line {s.line ?? '—'}: {s.issue}</span>
+                      </div>
+                      <p className="text-[11px] text-surface-400 mt-1">{s.suggestion}</p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Right: Live HTML/CSS/JS Preview */}
         {isHtml && (

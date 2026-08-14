@@ -13,7 +13,7 @@ const getRooms = catchAsync(async (req, res) => {
 
 const getMyRooms = catchAsync(async (req, res) => {
   const rooms = await roomService.getUserRooms(req.user.id);
-  res.json({ success: true, data: { rooms } });
+  res.json({ success: true, data: { rooms } }); //check the data 
 });
 
 const getRoomById = catchAsync(async (req, res) => {
@@ -62,7 +62,7 @@ const createSession = catchAsync(async (req, res) => {
 });
 
 const endSession = catchAsync(async (req, res) => {
-  const session = await roomService.endSession(req.params.sessionId, req.user.id);
+  const session = await roomService.endSession(req.params.sessionId, req.user.id, req.params.id);
   res.json({ success: true, data: { session } });
 });
 

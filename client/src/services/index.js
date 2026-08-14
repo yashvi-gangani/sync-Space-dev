@@ -51,4 +51,6 @@ export const chatService = {
 export const replayService = {
   getReplay: (roomId, sessionId) => api.get(`/replay/${roomId}/sessions/${sessionId}`),
   getSnapshots: (roomId) => api.get(`/replay/${roomId}/snapshots`),
+  generateSummary: (roomId, sessionId) => api.post(`/replay/${roomId}/sessions/${sessionId}/summary`),
+  getAnalytics: (roomId, sessionId) => api.get(`/replay/${roomId}/sessions/${sessionId}/analytics`),
 };

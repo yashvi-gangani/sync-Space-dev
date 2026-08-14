@@ -4,6 +4,7 @@ import * as Y from 'yjs';
 import { useSocket } from '../../context/SocketContext';
 import { useRoomStore } from '../../store/roomStore';
 import { useDocumentStore } from '../../store/documentStore';
+import { TbHistory, TbX } from 'react-icons/tb';
 
 export default function DocumentEditor({ doc }) {
   const { currentRoom } = useRoomStore();
@@ -12,6 +13,7 @@ export default function DocumentEditor({ doc }) {
   
   const [content, setContent] = useState(doc.content || '');
   const [saveStatus, setSaveStatus] = useState('saved');
+  const [showVersions, setShowVersions] = useState(false);
 
   const ydocRef = useRef(null);
   const editorRef = useRef(null);
@@ -21,6 +23,11 @@ export default function DocumentEditor({ doc }) {
 
   // Determine Monaco language
   const language = doc.type === 'markdown' ? 'markdown' : 'plaintext';
+
+  useEffect(() => {
+    setContent(doc.content || '');
+  }, [doc._id, doc.content]);
+
 
   useEffect(() => {
     if (!currentRoom || !socket) return;
@@ -109,6 +116,24 @@ export default function DocumentEditor({ doc }) {
 
   const handleSave = () => {
     saveVersion(doc._id, content);
+    setSaveStatus('saved');
+  };
+
+  const handleRestoreVersion = (version) => {
+    if (!window.confirm('Restore this saved version? The current content will be saved as a new version.')) return;
+
+    const restoredContent = version.content || '';
+    setContent(restoredContent);
+    const ydoc = ydocRef.current;
+    if (ydoc) {
+      const ytext = ydoc.getText('content');
+      ydoc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, restoredContent);
+      }, 'local');
+    }
+    saveVersion(doc._id, restoredContent);
+    setShowVersions(false);
   };
 
   return (
@@ -121,10 +146,53 @@ export default function DocumentEditor({ doc }) {
            <span className={`text-xs transition-colors ${saveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'}`}>
              {saveStatus === 'saving' ? '● Saving…' : '✓ Saved'}
            </span>
-           <button onClick={handleSave} className="btn-primary btn-sm py-1">Save Version</button>
+           <button onClick={() => setShowVersions((open) => !open)} className="btn-secondary btn-sm py-1 flex items-center gap-1">
+            <TbHistory size={14} /> Versions ({doc.versions?.length || 0})
+          </button>
+          <button onClick={handleSave} className="btn-primary btn-sm py-1">Save Version</button>
         </div>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
+        {showVersions && (
+          <div className="absolute top-2 right-2 z-20 w-80 max-h-[70%] overflow-y-auto rounded-xl border border-surface-700 bg-surface-900/95 shadow-2xl backdrop-blur p-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <TbHistory size={15} className="text-primary-400" /> Version History
+              </div>
+              <button onClick={() => setShowVersions(false)} className="p-1 rounded hover:bg-surface-800 text-surface-400">
+                <TbX size={15} />
+              </button>
+            </div>
+            {(doc.versions || []).length === 0 ? (
+              <p className="text-xs text-surface-500 py-5 text-center">No saved versions yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {[...(doc.versions || [])].reverse().map((version, index) => (
+                  <div key={`${version.savedAt}-${index}`} className="rounded-lg border border-surface-800 bg-surface-950/60 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-medium text-white">
+                          Version {(doc.versions?.length || 0) - index}
+                        </p>
+                        <p className="text-[10px] text-surface-500 mt-0.5">
+                          {version.savedBy?.name || 'Member'} · {version.savedAt ? new Date(version.savedAt).toLocaleString() : 'Unknown time'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRestoreVersion(version)}
+                        className="text-[10px] px-2 py-1 rounded bg-primary-600 hover:bg-primary-500 text-white"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-surface-500 mt-2 line-clamp-2 whitespace-pre-wrap">{version.content || '(empty)'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <MonacoEditor
           height="100%"
           language={language}

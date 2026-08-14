@@ -25,12 +25,12 @@ const connectDB = async () => {
     mongoose.connection.on('disconnected', () => {
       isConnected = false;
       console.warn('⚠️ MongoDB disconnected. Retrying...');
-      setTimeout(connectDB, 5000);
+      setTimeout(connectDB, 6000);
     });
   } catch (err) {
-    console.error('❌ MongoDB connection failed:', err.message);
+    console.error('❌ MongoDB connection failed:', err.message); // if Any err ,it will be printed
     throw err;
   }
 };
-
+//ch
 module.exports = { connectDB };

@@ -3,20 +3,19 @@ import Peer from 'simple-peer';
 import { useSocket } from '../../context/SocketContext';
 import { useMeetingStore } from '../../store/meetingStore';
 import { useRoomStore } from '../../store/roomStore';
+import { useAuthStore } from '../../store/authStore';
 
 export default function MeetingManager() {
   const { socket, emitWebRTCSignal } = useSocket();
-  const { currentRoom } = useRoomStore();
+  const { currentRoom, members } = useRoomStore();
+  const { user: authUser } = useAuthStore();
   const {
-    isInMeeting,
-    localStream,
-    setLocalStream,
-    localScreenStream,
-    setLocalScreenStream,
-    addParticipant,
-    removeParticipant,
-    isScreenSharing
-  } = useMeetingStore();
+  isInMeeting,
+  localStream,
+  localScreenStream,
+  meetingParticipants,
+  isScreenSharing
+} = useMeetingStore();
 
   function createPeer(targetUserId, incomingSignal, stream, initiator = false, isScreen = false) {
     const peer = new Peer({
@@ -60,7 +59,7 @@ export default function MeetingManager() {
       const ref = isScreen ? screenPeersRef : peersRef;
       let peer = ref.current[senderUserId];
       
-      const { localStream: freshLocalStream, localScreenStream: freshScreenStream } = useMeetingStore.getState();
+      const { localStream: freshLocalStream } = useMeetingStore.getState();
       const streamToUse = isScreen ? null : freshLocalStream; // We don't send screen stream in response to screen peer offer usually, but wait, the screen sharer initiates!
 
       if (!peer) {
@@ -72,19 +71,28 @@ export default function MeetingManager() {
       }
     };
 
-    const handleMeetingJoin = ({ userId, name }) => {
+    const handleMeetingJoin = ({ userId, name, audioEnabled = true, videoEnabled = true }) => {
       const { isInMeeting: freshIsInMeeting, localStream: freshLocalStream, isScreenSharing: freshSharing, localScreenStream: freshScreenStream } = useMeetingStore.getState();
       
       if (freshIsInMeeting) {
         const peer = createPeer(userId, null, freshLocalStream, true, false);
         peersRef.current[userId] = peer;
-        useMeetingStore.getState().addParticipant({ id: userId, name });
+        useMeetingStore.getState().addParticipant({ id: userId, name, audioEnabled, videoEnabled });
 
         // If I am sharing screen, I should also initiate a screen peer to the new user!
         if (freshSharing && freshScreenStream) {
-          const screenPeer = createPeer(userId, null, freshScreenStream, true, true);
-          screenPeersRef.current[userId] = screenPeer;
-        }
+  if (!screenPeersRef.current[userId]) {
+    const screenPeer = createPeer(
+      userId,
+      null,
+      freshScreenStream,
+      true,
+      true
+    );
+
+    screenPeersRef.current[userId] = screenPeer;
+  }
+}
       }
     };
 
@@ -128,22 +136,54 @@ export default function MeetingManager() {
     };
   }, [socket, currentRoom]);
 
-  // When I start screen sharing, initiate screen peers to all existing meeting participants!
+  // When I start screen sharing, push a peer connection to EVERY online room member,
+  // not just the people who happen to have joined the audio/video call.
+  // Screen sharing should be visible to the whole room, joining the call is a separate thing.
   useEffect(() => {
-    if (isScreenSharing && localScreenStream) {
-      const participants = useMeetingStore.getState().meetingParticipants;
-      participants.forEach(p => {
-        if (!screenPeersRef.current[p.id]) {
-          const screenPeer = createPeer(p.id, null, localScreenStream, true, true);
-          screenPeersRef.current[p.id] = screenPeer;
-        }
-      });
-    } else {
-      // If I stopped, destroy all my initiated screen peers
-      Object.values(screenPeersRef.current).forEach(peer => peer.destroy());
-      screenPeersRef.current = {};
+    if (!isScreenSharing || !localScreenStream) {
+      return;
     }
-  }, [isScreenSharing, localScreenStream]);
+
+    const selfId = authUser?.id || authUser?._id;
+
+    (members || []).forEach((m) => {
+      const u = m.user || m;
+      const uid = u._id || u.id;
+
+      if (!uid || uid === selfId) return;
+      if (u.isOnline === false) return; // skip members who aren't currently connected
+      if (screenPeersRef.current[uid]) return; // already sharing with this person
+
+      const screenPeer = createPeer(uid, null, localScreenStream, true, true);
+      screenPeersRef.current[uid] = screenPeer;
+    });
+
+    return () => {
+      // Don't destroy them just because the member list changed.
+      // They are destroyed when screen sharing actually stops.
+    };
+  }, [isScreenSharing, localScreenStream, members]);
+
+    // Connect to participants who were already in the meeting
+  useEffect(() => {
+    if (!isInMeeting || !localStream) return;
+
+    const participants = useMeetingStore.getState().meetingParticipants;
+
+    participants.forEach((participant) => {
+      if (!participant.id || peersRef.current[participant.id]) return;
+
+      const peer = createPeer(
+        participant.id,
+        null,
+        localStream,
+        true,
+        false
+      );
+
+      peersRef.current[participant.id] = peer;
+    });
+  }, [isInMeeting, localStream, meetingParticipants]);
 
   // Clean up on unmount or when leaving meeting
   useEffect(() => {

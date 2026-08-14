@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 export default function RoomPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { currentRoom, setCurrentRoom, members, setMembers, setCurrentSession } = useRoomStore();
+  const { currentRoom, setCurrentRoom, members, setMembers } = useRoomStore();
   const { user } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
@@ -63,16 +63,6 @@ export default function RoomPage() {
     fetchRoomData();
   }, [slug, navigate, setCurrentRoom, setMembers]);
 
-  const handleStartSession = async (mode) => {
-    try {
-      const res = await roomService.createSession(currentRoom._id);
-      setCurrentSession(res.data.data.session);
-      navigate(`/room/${slug}/${mode}`);
-    } catch (err) {
-      toast.error('Failed to start a session.');
-    }
-  };
-
   const handleKick = async (targetUserId) => {
     try {
       await roomService.kickMember(currentRoom._id, targetUserId);
@@ -120,7 +110,7 @@ export default function RoomPage() {
   const isOwner = currentRoom.owner._id === user._id;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
       {/* Header Banner */}
       <div className="card p-8 bg-gradient-to-br from-surface-900 via-surface-900 to-primary-950/20 border-surface-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2">
@@ -129,27 +119,38 @@ export default function RoomPage() {
             <span className="badge badge-primary">{currentRoom.type}</span>
           </div>
           <p className="text-surface-400 text-sm max-w-2xl">{currentRoom.description || 'No description provided.'}</p>
+          <div className="inline-flex items-center gap-2 mt-2 px-2.5 py-1.5 rounded-lg bg-surface-800 border border-surface-700">
+            <span className="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Room ID</span>
+            <code className="text-xs font-bold tracking-widest text-primary-300">{currentRoom.slug}</code>
+            <button
+              onClick={handleCopyInviteLink}
+              className="text-surface-400 hover:text-white"
+              title="Copy room link"
+            >
+              <TbCopy size={14} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
           <button
             onClick={() => navigate(`/room/${slug}/collaborate`)}
-            className="btn-primary"
+            className="btn-primary flex-1 sm:flex-none justify-center"
           >
             <TbLayoutColumns size={18} />
             <span>Open Space</span>
           </button>
-          <button onClick={handleCopyInviteLink} className="btn-secondary" title="Copy room link">
+          <button onClick={handleCopyInviteLink} className="btn-secondary flex-1 sm:flex-none justify-center" title="Copy room link">
             {copying ? <TbCopy size={18} /> : <TbLink size={18} />}
             <span className="hidden sm:inline">{copying ? 'Copied!' : 'Copy Link'}</span>
           </button>
           {!isOwner && (
-            <button onClick={handleLeaveRoom} className="btn-danger">
+            <button onClick={handleLeaveRoom} className="btn-danger flex-1 sm:flex-none justify-center">
               Leave Space
             </button>
           )}
           {isOwner && (
-            <button onClick={() => setSettingsOpen(true)} className="btn-secondary p-2.5">
+            <button onClick={() => setSettingsOpen(true)} className="btn-secondary p-2.5 flex-none">
               <TbSettings size={18} />
             </button>
           )}
@@ -157,7 +158,7 @@ export default function RoomPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-surface-800 pb-px">
+      <div className="flex items-center gap-2 border-b border-surface-800 pb-px overflow-x-auto whitespace-nowrap scrollbar-hide">
         <button 
           onClick={() => setActiveTab('overview')} 
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-primary-500 text-primary-400' : 'border-transparent text-surface-400 hover:text-white'}`}
@@ -248,13 +249,13 @@ export default function RoomPage() {
 
           <div className="card p-6 divide-y divide-surface-800/60 max-h-[420px] overflow-y-auto">
             {sessions.length === 0 ? (
-              <p className="text-sm text-surface-500 text-center py-12">No replay sessions found. Start a whiteboard or editor session to log activities.</p>
+              <p className="text-sm text-surface-500 text-center py-12">No recorded sessions yet. The workspace owner can start a recording from the collaboration space.</p>
             ) : (
               sessions.map((session) => (
                 <div key={session._id} className="py-4 flex items-center justify-between first:pt-0 last:pb-0">
                   <div>
                     <p className="text-sm font-medium text-white">
-                      Session Started by {session.startedBy.name}
+                      Recorded by {session.startedBy.name}
                     </p>
                     <p className="text-xs text-surface-450 mt-0.5">
                       Date: {new Date(session.startedAt).toLocaleDateString()} at {new Date(session.startedAt).toLocaleTimeString()}

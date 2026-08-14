@@ -11,4 +11,22 @@ const getSnapshots = catchAsync(async (req, res) => {
   res.json({ success: true, data: { snapshots } });
 });
 
-module.exports = { getReplay, getSnapshots };
+const generateSummary = catchAsync(async (req, res) => {
+  const summary = await replayService.generateSummary(
+    req.params.roomId,
+    req.params.sessionId,
+    req.user.id
+  );
+  res.json({ success: true, data: { summary } });
+});
+
+const getAnalytics = catchAsync(async (req, res) => {
+  const analytics = await replayService.getAnalytics(
+    req.params.roomId,
+    req.params.sessionId,
+    req.user.id
+  );
+  res.json({ success: true, data: { analytics } });
+});
+
+module.exports = { getReplay, getSnapshots, generateSummary, getAnalytics };

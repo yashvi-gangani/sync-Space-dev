@@ -229,21 +229,55 @@ class RoomService {
     const room = await Room.findById(roomId);
     if (!room) throw new AppError('Room not found', 404);
 
-    const isMember = room.members.some((m) => m.user.toString() === userId.toString());
-    // Allow non-members into public rooms
-    if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
+    if (room.owner.toString() !== userId.toString()) {
+      throw new AppError('Only the workspace owner can start session recording', 403);
+    }
 
-    const session = await Session.create({ room: roomId, startedBy: userId, participants: [userId] });
+    // Reuse an already-running recording instead of creating duplicate sessions.
+    const existing = await Session.findOne({ room: roomId, endedAt: null }).sort({ startedAt: -1 });
+    if (existing) return existing;
+
+    const session = await Session.create({
+      room: roomId,
+      startedBy: userId,
+      participants: [userId],
+      recording: true,
+    });
+    await ActivityLog.create({
+      user: userId,
+      room: roomId,
+      action: 'session_started',
+      details: { sessionId: session._id },
+    });
     await Room.findByIdAndUpdate(roomId, { lastActivity: new Date() });
     return session;
   }
 
-  async endSession(sessionId, userId) {
+  async endSession(sessionId, userId, roomId = null) {
     const session = await Session.findById(sessionId);
     if (!session) throw new AppError('Session not found', 404);
-    session.endedAt = new Date();
-    session.duration = Math.floor((session.endedAt - session.startedAt) / 1000);
-    await session.save();
+
+    const room = await Room.findById(session.room);
+    if (!room) throw new AppError('Room not found', 404);
+    if (roomId && room._id.toString() !== roomId.toString()) {
+      throw new AppError('Session does not belong to this workspace', 400);
+    }
+    if (room.owner.toString() !== userId.toString()) {
+      throw new AppError('Only the workspace owner can stop session recording', 403);
+    }
+
+    if (!session.endedAt) {
+      session.endedAt = new Date();
+      session.duration = Math.floor((session.endedAt - session.startedAt) / 1000);
+      session.recording = false;
+      await session.save();
+      await ActivityLog.create({
+        user: userId,
+        room: room._id,
+        action: 'session_ended',
+        details: { sessionId: session._id, duration: session.duration },
+      });
+    }
     return session;
   }
 

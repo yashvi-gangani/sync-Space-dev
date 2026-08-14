@@ -8,6 +8,7 @@ import JoinRoomModal from '../components/dashboard/JoinRoomModal';
 import {
   TbPlus, TbSearch, TbCompass, TbClock, TbUsers, TbLock, TbLockOpen,
   TbArrowRight, TbLayoutColumns, TbBrush, TbCode, TbBolt, TbMail, TbCheck,
+  TbStar, TbStarFilled
 } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
@@ -20,6 +21,13 @@ function timeAgo(dateStr) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 const ACTION_ICONS = {
@@ -35,6 +43,28 @@ export default function DashboardPage() {
   const [joinOpen, setJoinOpen] = useState(false);
   const [activity, setActivity] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
+
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('starred_rooms') || '[]');
+    } catch (_) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('starred_rooms', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (roomId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFavorites(prev => 
+      prev.includes(roomId) 
+        ? prev.filter(id => id !== roomId) 
+        : [...prev, roomId]
+    );
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -60,23 +90,23 @@ export default function DashboardPage() {
   const activeRooms = myRooms.filter((r) => r.isActive).length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-white">
-            Welcome back, {user?.name?.split(' ')[0]} 👋
+            {getGreeting()}, {user?.name?.split(' ')[0]} 👋
           </h1>
           <p className="text-surface-400 text-sm mt-1">
             Create or join collaborative real-time sync spaces.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setJoinOpen(true)} className="btn-secondary">
+        <div className="flex flex-col xs:flex-row sm:items-center gap-3 w-full sm:w-auto">
+          <button onClick={() => setJoinOpen(true)} className="btn-secondary flex-1 sm:flex-none justify-center">
             <TbSearch size={18} />
             <span>Join Space</span>
           </button>
-          <button onClick={() => setCreateOpen(true)} className="btn-primary">
+          <button onClick={() => setCreateOpen(true)} className="btn-primary flex-1 sm:flex-none justify-center">
             <TbPlus size={18} />
             <span>Create Space</span>
           </button>
@@ -111,7 +141,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { icon: <TbCompass size={20} className="text-primary-400"/>, label: 'My Workspaces', value: loading ? '…' : myRooms.length },
           { icon: <TbUsers size={20} className="text-green-400"/>, label: 'Total Members', value: loading ? '…' : totalMembers },
@@ -164,25 +194,40 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myRooms.map((room) => (
-                <div key={room._id} className="card p-5 hover:border-primary-500/50 hover:shadow-lg transition-all group flex flex-col justify-between h-44">
-                  {/* Room header */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white group-hover:text-primary-400 transition-colors truncate pr-2">
-                        {room.name}
-                      </h3>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {room.type === 'public'
-                          ? <TbLockOpen size={14} className="text-green-400" />
-                          : <TbLock size={14} className="text-yellow-400" />
-                        }
+              {[...myRooms]
+                .sort((a, b) => {
+                  const aFav = favorites.includes(a._id) ? 1 : 0;
+                  const bFav = favorites.includes(b._id) ? 1 : 0;
+                  return bFav - aFav; // Starred rooms first
+                })
+                .map((room) => {
+                  const isFav = favorites.includes(room._id);
+                  return (
+                    <div key={room._id} className="card p-5 hover:border-primary-500/50 hover:shadow-lg transition-all group flex flex-col justify-between h-44">
+                      {/* Room header */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-white group-hover:text-primary-400 transition-colors truncate pr-2">
+                            {room.name}
+                          </h3>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={(e) => toggleFavorite(room._id, e)}
+                              title={isFav ? "Unpin Workspace" : "Pin Workspace"}
+                              className={`p-1 rounded-md transition-all hover:bg-surface-700 ${isFav ? 'text-yellow-400' : 'text-surface-450 hover:text-yellow-400'}`}
+                            >
+                              {isFav ? <TbStarFilled size={15} /> : <TbStar size={15} />}
+                            </button>
+                            {room.type === 'public'
+                              ? <TbLockOpen size={14} className="text-green-400" />
+                              : <TbLock size={14} className="text-yellow-400" />
+                            }
+                          </div>
+                        </div>
+                        <p className="text-xs text-surface-450 line-clamp-2">
+                          {room.description || 'No description provided.'}
+                        </p>
                       </div>
-                    </div>
-                    <p className="text-xs text-surface-450 line-clamp-2">
-                      {room.description || 'No description provided.'}
-                    </p>
-                  </div>
 
                   {/* Stats + CTA */}
                   <div className="space-y-2.5">
@@ -211,7 +256,8 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
         </div>

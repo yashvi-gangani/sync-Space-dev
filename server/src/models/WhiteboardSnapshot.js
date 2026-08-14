@@ -7,7 +7,7 @@ const whiteboardSnapshotSchema = new mongoose.Schema({
   imageUrl: { type: String, required: true },
   imagePublicId: { type: String, required: true },
   canvasData: { type: mongoose.Schema.Types.Mixed, default: {} },
-  width: { type: Number, default: 1920 },
+  width: { type: Number, default: 1930 },
   height: { type: Number, default: 1080 },
   elementCount: { type: Number, default: 0 },
 }, { timestamps: true });

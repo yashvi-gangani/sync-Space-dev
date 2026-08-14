@@ -13,6 +13,6 @@ router.post('/refresh', authController.refreshToken);
 router.get('/verify-email/:token', authController.verifyEmail);
 router.post('/forgot-password', authLimiter, validate(authValidator.forgotPassword), authController.forgotPassword);
 router.post('/reset-password/:token', authLimiter, validate(authValidator.resetPassword), authController.resetPassword);
-router.get('/me', protect, authController.getMe);
+router.get('/me', protect, authController.getMe);//Protect auth check
 
 module.exports = router;

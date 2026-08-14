@@ -12,6 +12,7 @@ import MeetingManager from '../features/meeting/MeetingManager';
 import MeetingOverlay from '../features/meeting/MeetingOverlay';
 import ScreenShareViewer from '../features/meeting/ScreenShareViewer';
 import { useMeetingStore } from '../store/meetingStore';
+import { useAuthStore } from '../store/authStore';
 import {
   TbChevronLeft, TbUsers, TbMessage, TbLayoutColumns, TbBrush, TbCode,
   TbGripVertical, TbWifi, TbWifiOff, TbVideoPlus, TbPhoneOff, TbScreenShare, TbScreenShareOff
@@ -43,8 +44,31 @@ export default function CollaboratePage() {
   const navigate = useNavigate();
   const { currentRoom, currentSession, setCurrentRoom, setCurrentSession, setMembers, members } = useRoomStore();
   const { chatOpen, setChatOpen } = useUIStore();
-  const { socket, joinRoom, leaveRoom, isConnected, emitMeetingJoin, emitMeetingLeave, emitScreenShareStart, emitScreenShareStop } = useSocket();
-  const { isInMeeting, isScreenSharing, setMeetingState, clearMeeting, meetingParticipants } = useMeetingStore();
+  const { user } = useAuthStore();
+  const {
+    socket,
+    joinRoom,
+    leaveRoom,
+    isConnected,
+    emitMeetingJoin,
+    emitMeetingLeave,
+    emitScreenShareStart,
+    emitScreenShareStop,
+    emitMeetingMediaState,
+    emitSessionStart,
+    emitSessionEnd,
+    emitPresenterStart,
+    emitPresenterStop,
+  } = useSocket();
+  const {
+    isInMeeting,
+    isScreenSharing,
+    setMeetingState,
+    clearMeeting,
+    meetingParticipants,
+    presenterId,
+    followPresenterId,
+  } = useMeetingStore();
   const [searchParams] = useSearchParams();
   const docId = searchParams.get('doc');
 
@@ -56,6 +80,16 @@ export default function CollaboratePage() {
   const [activities, setActivities] = useState({}); // { userId: 'activity_string' }
   const containerRef = useRef(null);
   const joinedRef = useRef(false); // prevent double-join
+
+  const cleanupMeetingMedia = () => {
+  const {
+    localStream,
+    localScreenStream,
+  } = useMeetingStore.getState();
+
+  localStream?.getTracks().forEach((track) => track.stop());
+  localScreenStream?.getTracks().forEach((track) => track.stop());
+};
 
   // ── Step 1: Load room + create/find session ─────────────────────────────
   useEffect(() => {
@@ -83,16 +117,8 @@ export default function CollaboratePage() {
           } catch (_) { /* non-fatal */ }
         }
 
-        // Create a session (idempotent — server returns existing or creates new)
-        if (!currentSession) {
-          try {
-            const sRes = await roomService.createSession(room._id);
-            if (!cancelled) setCurrentSession(sRes.data.data.session);
-          } catch (sessionErr) {
-            console.warn('Session create warning (non-fatal):', sessionErr?.response?.data?.message);
-          }
-        }
-
+        // Session recording is explicitly controlled by the workspace owner.
+        // Participants simply join the currently active recording, if one exists.
       } catch (err) {
         console.error('CollaboratePage init error:', err);
         if (!cancelled) {
@@ -145,9 +171,17 @@ export default function CollaboratePage() {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const pct = ((clientX - rect.left) / rect.width) * 100;
-      setDividerX(Math.min(Math.max(pct, 25), 75));
+      const isMobile = window.innerWidth < 768;
+
+      if (isMobile) {
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const pct = ((clientY - rect.top) / rect.height) * 100;
+        setDividerX(Math.min(Math.max(pct, 20), 80));
+      } else {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const pct = ((clientX - rect.left) / rect.width) * 100;
+        setDividerX(Math.min(Math.max(pct, 20), 80));
+      }
     };
     const onUp = () => setDragging(false);
     window.addEventListener('mousemove', onMove);
@@ -186,12 +220,22 @@ export default function CollaboratePage() {
     const handleMeetingLeave = ({ userId }) => setActivities(prev => { const n = {...prev}; delete n[userId]; return n; });
     const handleScreenShareStart = ({ userId }) => setActivities(prev => ({ ...prev, [userId]: 'sharing_screen' }));
     const handleScreenShareStop = ({ userId }) => setActivities(prev => ({ ...prev, [userId]: 'in_meeting' }));
+    const handleSocketError = ({ message }) => {
+      if (message?.toLowerCase().includes('already sharing')) {
+        useMeetingStore.getState().localScreenStream?.getTracks().forEach((track) => track.stop());
+        useMeetingStore.getState().setMeetingState({
+          isScreenSharing: false,
+          localScreenStream: null,
+        });
+      }
+    };
 
     socket.on('user:activity_change', handleActivity);
     socket.on('meeting:join', handleMeetingJoin);
     socket.on('meeting:leave', handleMeetingLeave);
     socket.on('screen_share:start', handleScreenShareStart);
     socket.on('screen_share:stop', handleScreenShareStop);
+    socket.on('error', handleSocketError);
 
     return () => {
       socket.off('user:activity_change', handleActivity);
@@ -199,59 +243,181 @@ export default function CollaboratePage() {
       socket.off('meeting:leave', handleMeetingLeave);
       socket.off('screen_share:start', handleScreenShareStart);
       socket.off('screen_share:stop', handleScreenShareStop);
+      socket.off('error', handleSocketError);
     };
   }, [socket]);
 
   // ── Meeting & Screen Share Actions ───────────────────────────────────────
-  const handleToggleMeeting = async () => {
-    if (isInMeeting) {
-      emitMeetingLeave(currentRoom?._id);
-      clearMeeting();
-    } else {
+  const handleToggleScreenShare = async () => {
+  if (isScreenSharing) {
+    const { localScreenStream } = useMeetingStore.getState();
+
+    localScreenStream?.getTracks().forEach(track => track.stop());
+
+    setMeetingState({
+      isScreenSharing: false,
+      localScreenStream: null
+    });
+
+    emitScreenShareStop(currentRoom?._id);
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true
+      });
+
+      setMeetingState({
+        isScreenSharing: true,
+        localScreenStream: stream
+      });
+
+      emitScreenShareStart(currentRoom?._id);
+
+      stream.getVideoTracks()[0].onended = () => {
+        stream.getTracks().forEach(track => track.stop());
+
+        setMeetingState({
+          isScreenSharing: false,
+          localScreenStream: null
+        });
+
+        emitScreenShareStop(currentRoom?._id);
+      };
+    } catch (err) {
+      toast.error('Screen sharing cancelled.');
+    }
+  }
+};
+
+const handleToggleMeeting = async () => {
+  if (isInMeeting) {
+    cleanupMeetingMedia();
+    emitMeetingLeave(currentRoom?._id);
+    clearMeeting();
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+
+    setMeetingState({
+      isInMeeting: true,
+      localStream: stream,
+      audioEnabled: true,
+      videoEnabled: true
+    });
+
+    emitMeetingJoin(currentRoom?._id, true, true);
+    emitMeetingMediaState(currentRoom?._id, true, true);
+
+  } catch (err) {
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: true
+      });
+
+      setMeetingState({
+        isInMeeting: true,
+        localStream: audioStream,
+        audioEnabled: true,
+        videoEnabled: false
+      });
+
+      emitMeetingJoin(currentRoom?._id, true, false);
+      emitMeetingMediaState(currentRoom?._id, true, false);
+
+    } catch (err2) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setMeetingState({ isInMeeting: true, localStream: stream });
-        emitMeetingJoin(currentRoom?._id);
-      } catch (err) {
-        try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-          setMeetingState({ isInMeeting: true, localStream: audioStream, videoEnabled: false });
-          emitMeetingJoin(currentRoom?._id);
-        } catch (err2) {
-          try {
-            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            setMeetingState({ isInMeeting: true, localStream: videoStream, audioEnabled: false });
-            emitMeetingJoin(currentRoom?._id);
-          } catch (err3) {
-            setMeetingState({ isInMeeting: true, localStream: null, audioEnabled: false, videoEnabled: false });
-            emitMeetingJoin(currentRoom?._id);
-            toast.info('Joined as viewer (No camera/mic access).');
-          }
-        }
+        const videoStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+
+        setMeetingState({
+          isInMeeting: true,
+          localStream: videoStream,
+          audioEnabled: false,
+          videoEnabled: true
+        });
+
+        emitMeetingJoin(currentRoom?._id, false, true);
+        emitMeetingMediaState(currentRoom?._id, false, true);
+
+      } catch (err3) {
+        setMeetingState({
+          isInMeeting: true,
+          localStream: null,
+          audioEnabled: false,
+          videoEnabled: false
+        });
+
+        emitMeetingJoin(currentRoom?._id, false, false);
+        emitMeetingMediaState(currentRoom?._id, false, false);
+
+        toast.info('Joined as viewer (No camera/mic access).');
       }
+    }
+  }
+};
+
+  const isOwner = currentRoom?.owner?._id === user?._id || currentRoom?.owner === user?._id;
+  const isRecording = Boolean(currentSession && !currentSession.endedAt);
+
+  const handleToggleRecording = async () => {
+    if (!isOwner || !currentRoom?._id) return;
+
+    if (isRecording) {
+      try {
+        emitSessionEnd(currentRoom._id, currentSession._id);
+        await roomService.endSession(currentRoom._id, currentSession._id);
+        setCurrentSession(null);
+        toast.success('Session recording stopped and saved to history.');
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to stop recording.');
+      }
+      return;
+    }
+
+    try {
+      const res = await roomService.createSession(currentRoom._id);
+      const session = res.data.data.session;
+      setCurrentSession(session);
+      emitSessionStart(currentRoom._id, session._id);
+      toast.success('Session recording started. Everyone can replay it later.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Only the workspace owner can start recording.');
     }
   };
 
-  const handleToggleScreenShare = async () => {
-    if (isScreenSharing) {
-      const { localScreenStream } = useMeetingStore.getState();
-      localScreenStream?.getTracks().forEach(track => track.stop());
-      setMeetingState({ isScreenSharing: false, localScreenStream: null });
-      emitScreenShareStop(currentRoom?._id);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        setMeetingState({ isScreenSharing: true, localScreenStream: stream });
-        emitScreenShareStart(currentRoom?._id);
-        stream.getVideoTracks()[0].onended = () => {
-          setMeetingState({ isScreenSharing: false, localScreenStream: null });
-          emitScreenShareStop(currentRoom?._id);
-        };
-      } catch (err) {
-        toast.error('Screen sharing cancelled.');
-      }
+  const handleTogglePresenter = () => {
+    if (!currentRoom?._id) return;
+    if (presenterId === user?._id) {
+      emitPresenterStop(currentRoom._id);
+      setMeetingState({ presenterId: null, presenterName: null, followPresenterId: null });
+      return;
+    }
+    emitPresenterStart(currentRoom._id);
+  };
+
+  const handleToggleFollowPresenter = () => {
+    if (!presenterId || presenterId === user?._id) return;
+    setMeetingState({
+      followPresenterId: followPresenterId === presenterId ? null : presenterId,
+    });
+  };
+
+  useEffect(() => {
+  return () => {
+    if (isInMeeting) {
+      cleanupMeetingMedia();
+      emitMeetingLeave(currentRoom?._id);
     }
   };
+}, [isInMeeting, currentRoom?._id, emitMeetingLeave]);
 
   // ── Loading screen ───────────────────────────────────────────────────────
   if (loading) {
@@ -301,7 +467,7 @@ export default function CollaboratePage() {
           <TbChevronLeft size={18} />
         </Link>
 
-        <span className="font-semibold text-sm truncate max-w-[200px]" style={{ color: 'rgb(var(--text-base))' }}>
+        <span className="font-semibold text-sm truncate max-w-[100px] sm:max-w-[200px]" style={{ color: 'rgb(var(--text-base))' }}>
           {currentRoom?.name}
         </span>
 
@@ -316,8 +482,58 @@ export default function CollaboratePage() {
           </span>
         </div>
 
+        {/* Recording & Presenter controls */}
+        <div className="flex items-center gap-1 ml-2">
+          {isOwner && (
+            <button
+              onClick={handleToggleRecording}
+              className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                isRecording
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  : 'bg-surface-800 text-amber-400 hover:bg-surface-700'
+              }`}
+              title={isRecording ? 'Stop session recording' : 'Start session recording'}
+            >
+              {isRecording ? '● Recording' : 'Record'}
+            </button>
+          )}
+
+          {!presenterId && (
+            <button
+              onClick={handleTogglePresenter}
+              className="px-2 py-1.5 rounded text-xs bg-surface-800 text-purple-400 hover:bg-surface-700"
+              title="Start Presenter Mode"
+            >
+              Present
+            </button>
+          )}
+
+          {presenterId === user?._id && (
+            <button
+              onClick={handleTogglePresenter}
+              className="px-2 py-1.5 rounded text-xs bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+            >
+              Stop Presenting
+            </button>
+          )}
+
+          {presenterId && presenterId !== user?._id && (
+            <button
+              onClick={handleToggleFollowPresenter}
+              className={`px-2 py-1.5 rounded text-xs transition-colors ${
+                followPresenterId === presenterId
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-surface-800 text-primary-300 hover:bg-surface-700'
+              }`}
+              title="Follow the presenter's cursor on the whiteboard"
+            >
+              {followPresenterId === presenterId ? 'Following' : 'Follow'}
+            </button>
+          )}
+        </div>
+
         {/* Layout toggles */}
-        <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-0.5 border border-surface-700 ml-2">
+        <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-0.5 border border-surface-700 ml-auto md:ml-2">
           <button
             onClick={() => setLayout('whiteboard')}
             title="Whiteboard only"
@@ -363,8 +579,8 @@ export default function CollaboratePage() {
         </div>
 
         {/* Online members */}
-        <div className="ml-auto flex items-center gap-2 relative group">
-          <div className="flex items-center gap-1 text-xs text-surface-400">
+        <div className="ml-2 md:ml-auto flex items-center gap-2 relative group">
+          <div className="hidden sm:flex items-center gap-1 text-xs text-surface-400">
             <TbUsers size={14} />
             <span>{onlineCount} online</span>
           </div>
@@ -419,7 +635,7 @@ export default function CollaboratePage() {
       </div>
 
       {/* ── Main Area ─────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden relative" ref={containerRef}>
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative" ref={containerRef}>
         
         {/* Meeting Manager & Overlay — wrapped in error boundaries so they can never crash the page */}
         <FeatureBoundary name="MeetingManager">
@@ -442,7 +658,7 @@ export default function CollaboratePage() {
         {(layout === 'both' || layout === 'whiteboard') && (
           <div
             className="flex-shrink-0 overflow-hidden"
-            style={{ width: layout === 'both' ? `${dividerX}%` : '100%' }}
+            style={{ flexBasis: layout === 'both' ? `${dividerX}%` : '100%' }}
           >
             <WhiteboardPanel />
           </div>
@@ -453,10 +669,14 @@ export default function CollaboratePage() {
           <div
             onMouseDown={handleDividerMouseDown}
             onTouchStart={handleDividerMouseDown}
-            className={`flex-shrink-0 w-1.5 relative group cursor-col-resize hover:bg-primary-500/60 transition-colors ${dragging ? 'bg-primary-500/80' : 'bg-surface-800'}`}
+            className={`flex-shrink-0 relative group transition-colors 
+              h-1.5 w-full md:w-1.5 md:h-full 
+              cursor-row-resize md:cursor-col-resize 
+              hover:bg-primary-500/60 
+              ${dragging ? 'bg-primary-500/80' : 'bg-surface-800'}`}
           >
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-4 flex items-center justify-center">
-              <TbGripVertical size={16} className="text-surface-600 group-hover:text-primary-400 transition-colors" />
+            <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 md:inset-y-0 md:left-1/2 md:-translate-y-0 md:w-4 flex items-center justify-center">
+              <TbGripVertical size={16} className="text-surface-600 group-hover:text-primary-400 transition-colors rotate-90 md:rotate-0" />
             </div>
           </div>
         )}
@@ -464,8 +684,8 @@ export default function CollaboratePage() {
         {/* Editor or Document Panel */}
         {(layout === 'both' || layout === 'editor') && (
           <div
-            className="flex-1 overflow-hidden border-l border-surface-800"
-            style={{ width: layout === 'both' ? `${100 - dividerX}%` : '100%' }}
+            className="flex-1 overflow-hidden md:border-l border-t md:border-t-0 border-surface-800"
+            style={{ flexBasis: layout === 'both' ? `${100 - dividerX}%` : '100%' }}
           >
             {docId ? (
               <FeatureBoundary name="DocumentPanel">
@@ -479,7 +699,7 @@ export default function CollaboratePage() {
 
         {/* Chat Sidebar */}
         {chatOpen && (
-          <div className="flex-shrink-0 w-72 border-l border-surface-800 animate-slide-right">
+          <div className="absolute inset-y-0 right-0 w-[85vw] max-w-xs md:relative md:w-72 flex-shrink-0 z-50 border-l border-surface-800 animate-slide-right bg-surface-900 shadow-2xl md:shadow-none">
             <ChatPanel />
           </div>
         )}

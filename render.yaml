@@ -40,6 +40,11 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      # Optional AI session summaries
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
       # SMTP — set these in Render dashboard as secret env vars
       - key: SMTP_HOST
         value: smtp.gmail.com

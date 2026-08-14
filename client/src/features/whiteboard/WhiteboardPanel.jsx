@@ -3,6 +3,7 @@ import { Stage, Layer, Line, Rect, Circle, Arrow, Text, Transformer, Group } fro
 import { useWhiteboardStore } from '../../store/whiteboardStore';
 import { useSocket } from '../../context/SocketContext';
 import { useRoomStore } from '../../store/roomStore';
+import { useMeetingStore } from '../../store/meetingStore';
 import {
   TbMouse, TbPencil, TbSquare, TbCircle, TbArrowUpRight,
   TbLine, TbLetterT, TbEraser, TbArrowBackUp, TbArrowForwardUp,
@@ -18,6 +19,7 @@ function genId() { return Math.random().toString(36).slice(2, 9); }
 
 export default function WhiteboardPanel({ height = 500 }) {
   const { currentRoom } = useRoomStore();
+  const { presenterId, followPresenterId } = useMeetingStore();
   const { emitWhiteboardEvent, onCursorMove, emitCursorMove } = useSocket();
 
   const {
@@ -70,9 +72,16 @@ export default function WhiteboardPanel({ height = 500 }) {
   useEffect(() => {
     const clean = onCursorMove(({ userId, name, x, y }) => {
       setRemoteCursors((prev) => ({ ...prev, [userId]: { name, x, y } }));
+
+      if (presenterId && followPresenterId === presenterId && userId === presenterId) {
+        setPan((currentPan) => ({
+          x: stageSize.width / 2 - x * zoom,
+          y: stageSize.height / 2 - y * zoom,
+        }));
+      }
     });
     return clean;
-  }, [onCursorMove]);
+  }, [onCursorMove, presenterId, followPresenterId, stageSize.width, stageSize.height, zoom]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -333,7 +342,7 @@ export default function WhiteboardPanel({ height = 500 }) {
   return (
     <div className="w-full h-full bg-[#0b0f19] select-none relative overflow-hidden flex flex-col">
       {/* FLOATING TOP TOOLBAR */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-[#0b0f19]/80 backdrop-blur-md border border-slate-800/80 shadow-2xl rounded-2xl p-1.5 px-3 transition-all hover:border-slate-700">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-[#0b0f19]/80 backdrop-blur-md border border-slate-800/80 shadow-2xl rounded-2xl p-1.5 px-3 transition-all hover:border-slate-700 max-w-[90vw] overflow-x-auto no-scrollbar">
         {toolBtn('select', <TbMouse size={18}/>, 'Select (V)')}
         {toolBtn('hand', <TbHandGrab size={18}/>, 'Pan (H)')}
         {toolBtn('pen', <TbPencil size={18}/>, 'Pen (P)')}

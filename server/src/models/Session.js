@@ -11,8 +11,10 @@ const sessionSchema = new mongoose.Schema({
   editorSnapshot: { type: String, default: '' },
   editorLanguage: { type: String, default: 'javascript' },
   eventCount: { type: Number, default: 0 },
+  recording: { type: Boolean, default: true },
 }, { timestamps: true });
 
 sessionSchema.index({ room: 1, startedAt: -1 });
+sessionSchema.index({ room: 1, endedAt: 1, startedAt: -1 });
 
 module.exports = mongoose.model('Session', sessionSchema);

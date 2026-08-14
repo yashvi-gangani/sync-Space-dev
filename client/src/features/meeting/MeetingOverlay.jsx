@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useMeetingStore } from '../../store/meetingStore';
-import { TbMicrophone, TbMicrophoneOff, TbVideo, TbVideoOff, TbPhoneOff } from 'react-icons/tb';
+import { useSocket } from '../../context/SocketContext';
+import { TbMicrophone, TbMicrophoneOff, TbVideo, TbVideoOff } from 'react-icons/tb';
 
 const VideoStream = ({ stream, isLocal, muted }) => {
   const videoRef = useRef(null);
@@ -23,6 +24,7 @@ const VideoStream = ({ stream, isLocal, muted }) => {
 };
 
 export default function MeetingOverlay({ roomId }) {
+  const { emitMeetingMediaState } = useSocket();
   const { isInMeeting, localStream, meetingParticipants, audioEnabled, videoEnabled, setMeetingState } = useMeetingStore();
 
   if (!isInMeeting) return null;
@@ -30,14 +32,18 @@ export default function MeetingOverlay({ roomId }) {
   const toggleAudio = () => {
     if (localStream) {
       localStream.getAudioTracks().forEach(track => track.enabled = !audioEnabled);
-      setMeetingState({ audioEnabled: !audioEnabled });
+      const nextAudioEnabled = !audioEnabled;
+      setMeetingState({ audioEnabled: nextAudioEnabled });
+      emitMeetingMediaState(roomId, nextAudioEnabled, videoEnabled);
     }
   };
 
   const toggleVideo = () => {
     if (localStream) {
       localStream.getVideoTracks().forEach(track => track.enabled = !videoEnabled);
-      setMeetingState({ videoEnabled: !videoEnabled });
+      const nextVideoEnabled = !videoEnabled;
+      setMeetingState({ videoEnabled: nextVideoEnabled });
+      emitMeetingMediaState(roomId, audioEnabled, nextVideoEnabled);
     }
   };
 
@@ -65,8 +71,14 @@ export default function MeetingOverlay({ roomId }) {
           ) : (
             <div className="w-full h-full flex items-center justify-center text-surface-500">Connecting...</div>
           )}
-          <div className="absolute bottom-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs text-white">
-            {p.name || 'Participant'}
+          <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between gap-2">
+            <div className="bg-black/60 px-2 py-0.5 rounded text-xs text-white truncate">
+              {p.name || 'Participant'}
+            </div>
+            <div className="flex items-center gap-1 bg-black/60 rounded p-1 text-white">
+              {p.audioEnabled === false ? <TbMicrophoneOff size={13} className="text-red-400" /> : <TbMicrophone size={13} />}
+              {p.videoEnabled === false ? <TbVideoOff size={13} className="text-red-400" /> : <TbVideo size={13} />}
+            </div>
           </div>
         </div>
       ))}

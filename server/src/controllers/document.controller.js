@@ -94,6 +94,7 @@ exports.saveVersion = catchAsync(async (req, res, next) => {
   document.content = content;
   document.versions.push({ content, savedBy: req.user.id, savedAt: Date.now() });
   await document.save();
+  await document.populate('versions.savedBy', 'name avatar');
 
   res.status(200).json({ status: 'success', data: { document } });
 });

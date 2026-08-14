@@ -8,7 +8,7 @@ const getMessages = catchAsync(async (req, res) => {
 
 const deleteMessage = catchAsync(async (req, res) => {
   const message = await chatService.deleteMessage(req.params.id, req.user.id);
-  res.json({ success: true, data: { message } });
+  res.json({ success: true, data: { message } }); // true it send or work
 });
 
 const markSeen = catchAsync(async (req, res) => {
