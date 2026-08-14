@@ -14,8 +14,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 5000
+      # PORT is automatically assigned by Render — do not hardcode it
       # MONGO_URI — set this in Render dashboard as a secret env var
       - key: MONGO_URI
         sync: false
@@ -56,6 +55,9 @@ services:
         sync: false
       - key: SMTP_FROM
         value: "SyncSpace <noreply@syncspace.io>"
+      # Gemini API — set this in Render dashboard as a secret env var
+      - key: GEMINI_API_KEY
+        sync: false
 
   # ──────────────────────────────────────────────────────────────────────
   # Frontend: React/Vite Static Site

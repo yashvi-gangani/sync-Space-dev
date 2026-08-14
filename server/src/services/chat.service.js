@@ -3,7 +3,7 @@ const Room = require('../models/Room');
 const AppError = require('../utils/AppError');
 
 class ChatService {
-  async getMessages(roomId, userId, { page = 1, limit = 50 } = {}) {
+  async getMessages(roomId, sessionId, userId, { page = 1, limit = 50 } = {}) {
     const room = await Room.findById(roomId);
     if (!room) throw new AppError('Room not found', 404);
     const isMember = room.members.some((m) => m.user.toString() === userId.toString());
@@ -11,7 +11,10 @@ class ChatService {
     if (!isMember && room.type !== 'public') throw new AppError('Access denied', 403);
 
     const skip = (Number(page) - 1) * Number(limit);
-    const messages = await ChatMessage.find({ room: roomId, isDeleted: false })
+    const query = { room: roomId, isDeleted: false };
+    if (sessionId) query.session = sessionId;
+
+    const messages = await ChatMessage.find(query)
       .populate('sender', 'name avatar')
       .populate({ path: 'replyTo', populate: { path: 'sender', select: 'name' } })
       .sort({ createdAt: -1 })
@@ -21,8 +24,8 @@ class ChatService {
     return messages.reverse();
   }
 
-  async createMessage(roomId, senderId, { content, type = 'text', replyTo }) {
-    const message = await ChatMessage.create({ room: roomId, sender: senderId, content, type, replyTo: replyTo || null });
+  async createMessage(roomId, sessionId, senderId, { content, type = 'text', replyTo }) {
+    const message = await ChatMessage.create({ room: roomId, session: sessionId || null, sender: senderId, content, type, replyTo: replyTo || null });
     await Room.findByIdAndUpdate(roomId, { lastActivity: new Date() });
     return message.populate([
       { path: 'sender', select: 'name avatar' },

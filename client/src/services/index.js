@@ -37,7 +37,10 @@ export const roomService = {
   createSession: (id) => api.post(`/rooms/${id}/sessions`),
   endSession: (id, sessionId) => api.patch(`/rooms/${id}/sessions/${sessionId}/end`),
   getSessions: (id) => api.get(`/rooms/${id}/sessions`),
+  startRecording: (id, sessionId) => api.post(`/rooms/${id}/sessions/${sessionId}/recording/start`),
+  saveRecording: (id, sessionId, formData) => api.post(`/rooms/${id}/sessions/${sessionId}/recording/save`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getPendingInvitations: () => api.get('/rooms/invitations/pending'),
+  generateSessionSummary: (id, sessionId) => api.post(`/rooms/${id}/sessions/${sessionId}/summary`),
   leave: (id) => api.post(`/rooms/${id}/leave`),
 };
 
@@ -53,4 +56,8 @@ export const replayService = {
   getSnapshots: (roomId) => api.get(`/replay/${roomId}/snapshots`),
   generateSummary: (roomId, sessionId) => api.post(`/replay/${roomId}/sessions/${sessionId}/summary`),
   getAnalytics: (roomId, sessionId) => api.get(`/replay/${roomId}/sessions/${sessionId}/analytics`),
+};
+
+export const executionService = {
+  executeCode: (language, code) => api.post('/execute', { language, code }),
 };
