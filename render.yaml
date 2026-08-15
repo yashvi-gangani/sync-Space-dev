@@ -29,9 +29,9 @@ services:
         value: 7d
       # CLIENT_URL: comma-separated list of allowed frontend origins
       - key: CLIENT_URL
-        value: https://syncspace-frontend-05u3.onrender.com
+        value: https://syncspace-frontend-unuy.onrender.com
       - key: APP_URL
-        value: https://syncspace-backend-44cl.onrender.com
+        value: https://syncspace-backend-s9fy.onrender.com
       # Cloudinary — set these in Render dashboard as secret env vars
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
