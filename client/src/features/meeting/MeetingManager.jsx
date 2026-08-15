@@ -201,6 +201,27 @@ export default function MeetingManager() {
     });
   }, [isInMeeting, localStream, meetingParticipants]);
 
+    // Connect to participants who were already in the meeting
+  useEffect(() => {
+    if (!isInMeeting || !localStream) return;
+
+    const participants = useMeetingStore.getState().meetingParticipants;
+
+    participants.forEach((participant) => {
+      if (!participant.id || peersRef.current[participant.id]) return;
+
+      const peer = createPeer(
+        participant.id,
+        null,
+        localStream,
+        true,
+        false
+      );
+
+      peersRef.current[participant.id] = peer;
+    });
+  }, [isInMeeting, localStream, meetingParticipants]);
+
   // Clean up on unmount or when leaving meeting
   useEffect(() => {
     if (!isInMeeting) {

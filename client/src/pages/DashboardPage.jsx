@@ -230,30 +230,84 @@ export default function DashboardPage() {
                       </div>
 
                   {/* Stats + CTA */}
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-3 text-xs text-surface-400">
-                      <span className="flex items-center gap-1">
-                        <TbUsers size={12} />
-                        {room.members?.length || 0} members
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <TbClock size={12} />
-                        {timeAgo(room.lastActivity || room.updatedAt)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        {room.activeMode === 'both' && <><TbBrush size={12}/><TbCode size={12}/></>}
-                        {room.activeMode === 'whiteboard' && <TbBrush size={12}/>}
-                        {room.activeMode === 'editor' && <TbCode size={12}/>}
-                      </span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-surface-400 mt-2">
+                      {/* Stacked Avatars */}
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex -space-x-1.5">
+                          {room.members?.slice(0, 3).map((m, idx) => {
+                            const u = m.user || m;
+                            const initial = u.name?.charAt(0).toUpperCase() || '?';
+                            return (
+                              <div
+                                key={idx}
+                                title={u.name || 'Member'}
+                                className="w-6 h-6 rounded-full border border-surface-900 bg-primary-800 text-white font-bold flex items-center justify-center text-[9px] flex-shrink-0"
+                              >
+                                {u.avatar ? (
+                                  <img src={u.avatar} alt={u.name} className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  initial
+                                )}
+                              </div>
+                            );
+                          })}
+                          {room.members?.length > 3 && (
+                            <div className="w-6 h-6 rounded-full border border-surface-900 bg-surface-800 text-surface-300 font-bold flex items-center justify-center text-[8px] flex-shrink-0">
+                              +{room.members.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Last activity */}
+                      <div className="flex items-center gap-1 text-[10px] text-surface-450 font-medium">
+                        <TbClock size={12} className="text-surface-450" />
+                        <span>{timeAgo(room.lastActivity || room.updatedAt)}</span>
+                      </div>
                     </div>
 
-                    <Link
-                      to={`/room/${room.slug}/collaborate`}
-                      className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold transition-colors"
-                    >
-                      <span>Open Space</span>
-                      <TbArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                    </Link>
+                    <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-surface-800/40">
+                      {/* Main Open Space Link */}
+                      <Link
+                        to={`/room/${room.slug}/collaborate`}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold rounded-lg transition-all h-8"
+                      >
+                        <span>Open Space</span>
+                        <TbArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                      </Link>
+
+                      {/* Quick Whiteboard Shortcut */}
+                      {['both', 'whiteboard'].includes(room.activeMode) && (
+                        <Link
+                          to={`/room/${room.slug}/collaborate?layout=whiteboard`}
+                          title="Open Whiteboard"
+                          className="p-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-green-400 border border-surface-700/50 hover:border-green-500/30 transition-all flex items-center justify-center h-8 w-8"
+                        >
+                          <TbBrush size={14} />
+                        </Link>
+                      )}
+
+                      {/* Quick Code Editor Shortcut */}
+                      {['both', 'editor'].includes(room.activeMode) && (
+                        <Link
+                          to={`/room/${room.slug}/collaborate?layout=editor`}
+                          title="Open Code Editor"
+                          className="p-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-purple-400 border border-surface-700/50 hover:border-purple-500/30 transition-all flex items-center justify-center h-8 w-8"
+                        >
+                          <TbCode size={14} />
+                        </Link>
+                      )}
+
+                      {/* Copy Invite Link */}
+                      <button
+                        onClick={(e) => handleCopyLink(room.slug, e)}
+                        title="Copy Invite Link"
+                        className="p-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-surface-450 hover:text-white border border-surface-700/50 transition-all flex items-center justify-center h-8 w-8"
+                      >
+                        <TbCopy size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

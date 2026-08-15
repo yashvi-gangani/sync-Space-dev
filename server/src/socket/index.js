@@ -61,7 +61,7 @@ function recordReplayEvent(roomId, roomData, socket, type, data = {}) {
 }
 
 function initializeSocket(server) {
-  // Build allowed origins array (supports comma-separated CLIENT_URL for multi-origin)
+  // Build allowed origins array (supports comma-separated CLIENT_URL for multi-origin)..
   const allowedOrigins = process.env.CLIENT_URL
     ? process.env.CLIENT_URL.split(",").map((u) => u.trim())
     : [];
