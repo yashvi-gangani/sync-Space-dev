@@ -1,8 +1,5 @@
 const Y = require("yjs");
 const awarenessProtocol = require("y-protocols/awareness");
-const syncProtocol = require("y-protocols/sync");
-const encoding = require("lib0/encoding");
-const decoding = require("lib0/decoding");
 const { Server } = require("socket.io");
 const EVENTS = require("../events/socket.events");
 const { verifyAccessToken } = require("../config/jwt");
@@ -168,7 +165,7 @@ function initializeSocket(server) {
         if (activeSession) {
           await Session.updateOne(
             { _id: activeSession._id },
-            { $addToSet: { participants: socket.user.id } }
+            { $addToSet: { participants: socket.user.id } },
           );
         }
 
@@ -194,7 +191,9 @@ function initializeSocket(server) {
           whiteboardState: roomData.whiteboardState,
           chatHistory: recentMessages,
           activeMeetingParticipants: Array.from(roomData.meetingParticipants),
-          activeMeetingMediaStates: Object.fromEntries(roomData.meetingMediaState.entries()),
+          activeMeetingMediaStates: Object.fromEntries(
+            roomData.meetingMediaState.entries(),
+          ),
           activeScreenSharers: Array.from(roomData.screenSharers),
           activeSession: activeSession || null,
           presenterId: roomData.presenterId || null,
@@ -288,7 +287,9 @@ function initializeSocket(server) {
       const room = socket.currentRoom || roomId;
       const roomData = getOrCreateRoomDoc(room);
       roomData.whiteboardState = [];
-      recordReplayEvent(room, roomData, socket, "whiteboard", { type: "clear" });
+      recordReplayEvent(room, roomData, socket, "whiteboard", {
+        type: "clear",
+      });
       io.to(room).emit(EVENTS.WHITEBOARD_CLEAR, { userId: socket.user.id });
     });
 
@@ -299,10 +300,8 @@ function initializeSocket(server) {
       const uint8 = new Uint8Array(data);
 
       if (type === "sv") {
-        const encoder = encoding.createEncoder();
-        syncProtocol.writeSyncStep2(encoder, roomData.doc, uint8);
-        const reply = encoding.toUint8Array(encoder);
-        if (reply.length > 1) {
+        const reply = Y.encodeStateAsUpdate(roomData.doc, uint8);
+        if (reply.length > 0) {
           socket.emit(EVENTS.EDITOR_YJS_SYNC, {
             type: "update",
             data: Array.from(reply),
@@ -353,10 +352,8 @@ function initializeSocket(server) {
       const uint8 = new Uint8Array(data);
 
       if (type === "sv") {
-        const encoder = encoding.createEncoder();
-        syncProtocol.writeSyncStep2(encoder, doc, uint8);
-        const reply = encoding.toUint8Array(encoder);
-        if (reply.length > 1) {
+        const reply = Y.encodeStateAsUpdate(doc, uint8);
+        if (reply.length > 0) {
           socket.emit("document:yjs:sync", {
             docId,
             type: "update",
@@ -409,14 +406,12 @@ function initializeSocket(server) {
         if (!roomData.docAnnotations[docId])
           roomData.docAnnotations[docId] = {};
         roomData.docAnnotations[docId][pageNum] = annotations;
-        socket
-          .to(room)
-          .emit("document:annot:update", {
-            docId,
-            pageNum,
-            newAnnotations: annotations,
-            userId: socket.user.id,
-          });
+        socket.to(room).emit("document:annot:update", {
+          docId,
+          pageNum,
+          newAnnotations: annotations,
+          userId: socket.user.id,
+        });
       },
     );
 
@@ -473,28 +468,34 @@ function initializeSocket(server) {
     });
 
     // ── Meetings, recording & presenter state ──────────────────────
-    socket.on(EVENTS.MEETING_JOIN, async ({ roomId, audioEnabled = true, videoEnabled = true }) => {
-      const room = roomId || socket.currentRoom;
-      if (!room) return;
-      const roomData = getOrCreateRoomDoc(room);
-      roomData.meetingParticipants.add(socket.user.id);
-      roomData.meetingMediaState.set(socket.user.id, { audioEnabled, videoEnabled });
+    socket.on(
+      EVENTS.MEETING_JOIN,
+      async ({ roomId, audioEnabled = true, videoEnabled = true }) => {
+        const room = roomId || socket.currentRoom;
+        if (!room) return;
+        const roomData = getOrCreateRoomDoc(room);
+        roomData.meetingParticipants.add(socket.user.id);
+        roomData.meetingMediaState.set(socket.user.id, {
+          audioEnabled,
+          videoEnabled,
+        });
 
-      if (roomData.sessionId) {
-        await Session.updateOne(
-          { _id: roomData.sessionId },
-          { $addToSet: { participants: socket.user.id } }
-        ).catch(() => {});
-      }
+        if (roomData.sessionId) {
+          await Session.updateOne(
+            { _id: roomData.sessionId },
+            { $addToSet: { participants: socket.user.id } },
+          ).catch(() => {});
+        }
 
-      recordReplayEvent(room, roomData, socket, "meeting_join", {});
-      socket.to(room).emit(EVENTS.MEETING_JOIN, {
-        userId: socket.user.id,
-        name: socket.user.name,
-        audioEnabled,
-        videoEnabled,
-      });
-    });
+        recordReplayEvent(room, roomData, socket, "meeting_join", {});
+        socket.to(room).emit(EVENTS.MEETING_JOIN, {
+          userId: socket.user.id,
+          name: socket.user.name,
+          audioEnabled,
+          videoEnabled,
+        });
+      },
+    );
 
     socket.on(
       EVENTS.MEETING_MEDIA_STATE,
@@ -572,7 +573,8 @@ function initializeSocket(server) {
           Session.findById(sessionId),
           Room.findById(room).select("owner"),
         ]);
-        if (!session || !roomDocOwner || session.room.toString() !== room) return;
+        if (!session || !roomDocOwner || session.room.toString() !== room)
+          return;
         if (roomDocOwner.owner.toString() !== socket.user.id) {
           return socket.emit(EVENTS.ERROR, {
             message: "Only the workspace owner can stop recording.",
@@ -632,12 +634,10 @@ function initializeSocket(server) {
         roomData.screenSharers.add(socket.user.id);
         recordReplayEvent(room, roomData, socket, "screen_share_start", {});
       }
-      socket
-        .to(room)
-        .emit(EVENTS.SCREEN_SHARE_START, {
-          userId: socket.user.id,
-          name: socket.user.name,
-        });
+      socket.to(room).emit(EVENTS.SCREEN_SHARE_START, {
+        userId: socket.user.id,
+        name: socket.user.name,
+      });
     });
 
     socket.on(EVENTS.SCREEN_SHARE_STOP, ({ roomId }) => {
@@ -766,7 +766,7 @@ async function leaveRoom(socket, io) {
         ) {
           activeSession.endedAt = new Date();
           activeSession.duration = Math.floor(
-            (activeSession.endedAt - activeSession.startedAt) / 1000
+            (activeSession.endedAt - activeSession.startedAt) / 1000,
           );
           activeSession.recording = false;
           await activeSession.save();
