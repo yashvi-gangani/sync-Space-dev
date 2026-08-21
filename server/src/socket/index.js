@@ -417,26 +417,34 @@ function initializeSocket(server) {
 
     // ── Chat ───────────────────────────────────────────────────────
     socket.on(
-      EVENTS.CHAT_MESSAGE,
-      async ({ roomId, content, type, replyTo }) => {
-        try {
-          const room = socket.currentRoom || roomId;
-          const message = await chatService.createMessage(
-            room,
-            socket.user.id,
-            { content, type, replyTo },
-          );
-          const roomData = getOrCreateRoomDoc(room);
-          recordReplayEvent(room, roomData, socket, "chat", {
-            content,
-            type: type || "text",
-          });
-          io.to(room).emit(EVENTS.CHAT_MESSAGE, { message });
-        } catch (err) {
-          socket.emit(EVENTS.ERROR, { message: err.message });
-        }
-      },
-    );
+  EVENTS.CHAT_MESSAGE,
+  async ({ roomId, sessionId, content, type, replyTo }) => {
+    try {
+      const room = socket.currentRoom || roomId;
+
+      const message = await chatService.createMessage(
+        room,
+        sessionId || socket.currentSession || null,
+        socket.user.id,
+        { content, type, replyTo }
+      );
+
+      const roomData = getOrCreateRoomDoc(room);
+
+      recordReplayEvent(room, roomData, socket, "chat", {
+        content,
+        type: type || "text",
+      });
+
+      io.to(room).emit(EVENTS.CHAT_MESSAGE, { message });
+    } catch (err) {
+      console.error("❌ SOCKET SERVER ERROR:", err);
+      socket.emit(EVENTS.ERROR, {
+        message: err.message,
+      });
+    }
+  }
+);
 
     socket.on(EVENTS.CHAT_SEEN, ({ roomId }) => {
       chatService

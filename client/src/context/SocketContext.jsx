@@ -630,25 +630,27 @@ export function SocketProvider({ children }) {
 
 
   // ============================================================
-  // CHAT
-  // ============================================================
+// CHAT
+// ============================================================
 
-  const emitChatMessage = (
-    roomId,
-    content,
-    type,
-    replyTo
-  ) => {
-    socketRef.current?.emit(
-      EVENTS.CHAT_MESSAGE,
-      {
-        roomId,
-        content,
-        type,
-        replyTo,
-      }
-    );
-  };
+const emitChatMessage = (
+  roomId,
+  content,
+  type,
+  replyTo
+) => {
+  socketRef.current?.emit(
+    EVENTS.CHAT_MESSAGE,
+    {
+      roomId,
+      sessionId:
+        useRoomStore.getState().currentSession?._id || null,
+      content,
+      type,
+      replyTo,
+    }
+  );
+};
 
 
   const emitChatSeen = (roomId) => {
