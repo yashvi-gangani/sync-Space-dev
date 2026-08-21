@@ -27,7 +27,7 @@ import toast from "react-hot-toast";
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
   (import.meta.env.PROD
-    ? "https://syncspace-backend-s9fy.onrender.com"
+    ? "http://localhost:5000"
     : "http://localhost:5000");
 
 
@@ -334,6 +334,11 @@ export function SocketProvider({ children }) {
     socket.on(EVENTS.ROOM_ERROR, ({ message }) => {
       toast.error(message);
     });
+
+    socket.on("error", (error) => {
+  console.error("❌ SOCKET SERVER ERROR:", error);
+  toast.error(error?.message || "Socket error");
+});
 
 
     // ==========================================================
