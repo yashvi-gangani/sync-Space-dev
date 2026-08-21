@@ -130,8 +130,13 @@ export function SocketProvider({ children }) {
     console.log("🔌 Connecting Socket.IO to:", SOCKET_URL);
 
     const socket = io(SOCKET_URL, {
-      auth: {
-        token: accessToken,
+      // IMPORTANT: use a function, not a static object.
+      // Socket.IO calls this fresh on every connect AND every
+      // reconnection attempt, so it always sends the CURRENT
+      // token from the store instead of a stale snapshot taken
+      // when the socket was first created.
+      auth: (cb) => {
+        cb({ token: useAuthStore.getState().accessToken });
       },
 
       reconnection: true,
@@ -182,6 +187,11 @@ export function SocketProvider({ children }) {
         try {
           const { authService } = await import("../services/index.js");
 
+          // This call goes through the axios interceptor in api.js,
+          // which will refresh the access token on a 401 and update
+          // the auth store. Because socket `auth` above is now a
+          // function, the NEXT reconnection attempt will automatically
+          // pick up the refreshed token.
           await authService.getMe();
         } catch (error) {
           console.error("❌ Token refresh failed:", error);
